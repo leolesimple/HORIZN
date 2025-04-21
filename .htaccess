@@ -1,0 +1,57 @@
+Options -Indexes
+
+RewriteEngine On
+
+# Redirection HTTPS
+RewriteCond %{HTTPS} !=on
+RewriteRule ^(.*)$ https://leolesimple.com/$1 [R=301,L]
+
+# Pages d'erreur personnalisées
+ErrorDocument 401 //errors/401.html?type=401&come=htaccess
+ErrorDocument 403 //errors/403.html?type=403&come=htaccess
+ErrorDocument 404 //errors/404.html?type=404&come=htaccess
+ErrorDocument 500 //errors/500.html?type=500&come=htaccess
+
+# Désactiver les cookies de session (vérifie si ton serveur supporte cette directive)
+# SetEnv session.use_cookies '0';
+
+# Protection contre le framing
+<IfModule mod_headers.c>
+    Header set X-Frame-Options "DENY"
+</IfModule>
+
+# Protection des fichiers sensibles
+<FilesMatch "(\.env|phpinfo\.php|aws\.yml|config\.js|\.aws/credentials|\.env\.bak)$">
+    Require all denied
+</FilesMatch>
+
+<FilesMatch "\.(env|bak|config|yml|php|dist|swp|orig|disabled)$">
+    Require all denied
+</FilesMatch>
+
+# Blocage d'IP spécifique
+<RequireAll>
+    Require all granted
+    Require not ip 207.244.248.83
+    Require not ip 78.153.140.222
+    Require not ip 45.141.156.10
+    Require not ip 78.153.140.218
+    Require not ip 109.205.213.18
+    Require not ip 124.70.203.191
+    Require not ip 45.139.104.158
+    Require not ip 45.135.232.70
+    Require not ip 68.183.121.110
+    Require not ip 45.148.10.123
+    Require not ip 45.148.10.206
+    Require not ip 107.150.103.88
+    Require not ip 43.133.38.182
+    Require not ip 170.106.82.209
+    Require not ip 2602:80d:1000::49
+    Require not ip 2602:80d:1000::57
+    Require not ip 206.168.34.217
+    Require not ip 206.168.34.199
+</RequireAll>
+
+# Blocage des User-Agent suspects
+RewriteCond %{HTTP_USER_AGENT} (360Spider|AhrefsBot|Baiduspider|BLEXBot|Cliqzbot|DotBot|Exabot) [NC]
+RewriteRule .* - [F,L]
