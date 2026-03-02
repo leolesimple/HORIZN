@@ -1,0 +1,10 @@
+User-agent: *
+Disallow: /logs/
+Disallow: /hooks/
+Disallow: /.env
+Disallow: /phpinfo.php
+Disallow: /info.php
+Disallow: /*.sql$
+Disallow: /*.log$
+Disallow: /*.bak$
+Disallow: /*.swp$

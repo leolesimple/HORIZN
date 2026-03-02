@@ -1,6 +1,6 @@
 {
   "name": "isa",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "ISA (InfoStation API) is a RESTful API for InfoStation project, a proxy server for fetching data from the PRIM API and serving it to the client to avoid the rate limit of PRIM.",
   "main": "js/index.js",
   "scripts": {
