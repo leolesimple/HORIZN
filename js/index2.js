@@ -12,8 +12,7 @@ if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR);
 
 let stopsMap;
 (async () => {
-  const response = await fetch('https://leolesimple.com/infostation/arrets-stopPoint.json');
-  stopsMap = await response.json();
+    stopsMap = JSON.parse(fs.readFileSync('/var/www/html/isa-api/json/arrets-stopPoint.json', 'utf-8'));
 })();
 
 app.use((req, res, next) => {
