@@ -1,136 +1,162 @@
-# **ISA**
+# HORIZN
 
-## **Description**
-L'ISA (InfoStation API) permet d'obtenir les horaires des prochains trains pour un arrêt donné dans le réseau d'Île-de-France. Les données sont récupérées depuis l'API PRIM et organisées localement pour une consultation rapide.
+## Description
 
----
+HORIZN est une API Node.js/Express qui sert de proxy entre les clients InfoStation et l'API PRIM d'Ile-de-France Mobilites.
 
-## **Configuration**
+Le service expose un endpoint simple (`/nextTrains`) pour recuperer les prochains passages d'un arret, avec :
+- transformation des donnees PRIM (format SIRI) vers un JSON plus exploitable,
+- enrichissement des informations d'arret via un fichier local,
+- cache disque par `stopId` pour limiter les appels externes.
 
-### **Prérequis**
-- **Node.js** : version 14 ou supérieure
-- **Modules nécessaires** : `express`, `axios`, `fs`, `path`
-- Un fichier JSON contenant les arrêts : `arrets-stopPoint.json`
-
-### **Installation**
-1. Clonez le dépôt du projet.
-2. Installez les dépendances avec :
-   ```bash
-   npm install
-   ```
-3. Assurez-vous d'avoir les fichiers suivants dans le répertoire du projet :
-    - `primData.json` (fichier de données locales, généré automatiquement après la première requête globale)
-    - `arrets-stopPoint.json` (données de correspondance pour les arrêts)
-
-4. Remplacez la clé API PRIM par votre clé personnelle dans la constante `GLOBAL_API_KEY`.
-
-5. Lancez le serveur :
-   ```bash
-   node server.js
-   ```
 
 ---
 
-## **Endpoints**
+## Prerequis
 
-### **1. `/nextTrains`**
-Récupère les horaires des prochains trains pour un arrêt donné.
+- Node.js 14+
+- Dependances npm installees (`npm install`)
+- Fichier des arrets disponible (voir section Configuration)
 
-#### **Méthode** : `GET`
+---
 
-#### **Paramètres**
+## Installation
 
-| Paramètre   | Type     | Obligatoire | Description                                                                                     |
-|-------------|----------|-------------|-------------------------------------------------------------------------------------------------|
-| `stopId`    | `string` | Oui         | L'identifiant de l'arrêt pour lequel récupérer les horaires.                                    |
-| `lineRef`   | `string` | Non         | Référence de la ligne pour filtrer les résultats (optionnel, retourne toutes les lignes si absent). |
-
-#### **Réponse**
-
-- **200 OK**
-  ```json
-  {
-    "stopId": "STOP_ID",
-    "arrname": "Nom de l'arrêt",
-    "nextTrains": [
-      {
-        "line": "Nom de la ligne",
-        "direction": "Direction du train",
-        "destination": "Destination finale",
-        "mission": "Code mission (si disponible)",
-        "vehicleFeatures": "Caractéristiques du véhicule (si disponibles)",
-        "datedVehicleJourneyRef": "Identifiant du trajet",
-        "arrivalPlatformName": "Nom du quai d'arrivée",
-        "expectedArrivalTime": "Heure prévue d'arrivée",
-        "expectedDepartureTime": "Heure prévue de départ",
-        "departureStatus": "Statut du départ (prévu, retardé, etc.)"
-      }
-    ]
-  }
-  ```
-
-- **400 Bad Request**
-  ```json
-  {
-    "error": "Le paramètre stopId est requis."
-  }
-  ```
-
-- **404 Not Found**
-  ```json
-  {
-    "error": "Aucun horaire trouvé pour le stopId STOP_ID."
-  }
-  ```
-
-- **500 Internal Server Error**
-  ```json
-  {
-    "error": "Erreur lors de la récupération des horaires."
-  }
-  ```
-
-#### **Exemple de requête**
 ```bash
-curl "http://localhost:3000/nextTrains?stopId=43082&lineRef=C01742"
-curl "http://localhost:3000/nextTrains?stopId=43082"
+npm install
 ```
 
 ---
 
-## **Fonctionnement**
+## Configuration
 
-### **Récupération des données globales**
-Lors du démarrage du serveur, les données globales des horaires sont récupérées depuis l'API PRIM via l'URL `https://prim.iledefrance-mobilites.fr/marketplace/estimated-timetable`. Ces données sont ensuite triées et stockées dans le fichier `primData.json`.
+### Cle API PRIM
 
-### **Organisation des données**
-1. Les données sont classées par lignes (`lineRef`) dans `primData.json`.
-2. Lorsqu'une requête est effectuée sur `/nextTrains`, les données correspondantes à `stopId` et `lineRef` sont extraites et filtrées.
+Le code actuel lit la cle API PRIM depuis la constante `API_KEY` dans `js/index2.js`.
 
-### **Filtrage intelligent**
-- Exclusion des trajets dont la destination correspond au nom de l'arrêt d'entrée (`arrname`).
-- Suppression des doublons basée sur plusieurs critères (ligne, arrêt, heure d'arrivée, etc.).
+### Fichier des arrets
 
----
+Le code actuel charge les arrets depuis un chemin absolu :
 
-## **Notes Techniques**
+`/var/www/html/horizn-api/json/arrets-stopPoint.json`
 
-- **Gestion des fichiers** :
-    - Les données globales sont stockées localement dans `primData.json`.
-    - Les informations sur les arrêts (stopId, arrname) doivent être fournies dans `arrets-stopPoint.json`.
-
-- **Clé API** :
-  La clé utilisée pour les requêtes PRIM est définie dans `GLOBAL_API_KEY`. Veillez à sécuriser cette clé dans un environnement de production.
-
-- **Problèmes fréquents** :
-    - Si `primData.json` ou `arrets-stopPoint.json` est manquant ou mal formaté, le serveur ne fonctionnera pas correctement.
-    - Une erreur 503 sera renvoyée si les données globales ne sont pas disponibles.
+Le fichier doit contenir les correspondances `zdaid`, `arrname`, `arraccessibility` et `arrgeopoint`.
 
 ---
 
-## **Améliorations Futures**
-- Ajouter des tests unitaires.
-- Supporter plusieurs langues dans les messages d'erreur.
-- Implémenter une gestion des erreurs plus robuste pour les appels à l'API PRIM.
+## Lancement
 
-Pour toute question ou contribution, merci de contacter l'équipe de développement.
+Le point d'entree fonctionnel present dans ce depot est `js/index2.js`.
+
+```bash
+node js/index2.js
+```
+
+Le serveur ecoute sur `http://localhost:3000`.
+
+> Note: `package.json` pointe actuellement vers `js/index.js` pour `npm start`, mais ce fichier n'est pas present dans l'arborescence visible.
+
+---
+
+## Endpoint
+
+### `GET /nextTrains`
+
+Recupere les prochains passages pour un arret donne.
+
+#### Parametres
+
+| Parametre | Type     | Obligatoire | Description |
+|-----------|----------|-------------|-------------|
+| `stopId`  | `string` | Oui         | Identifiant de l'arret (ex: `43082`) |
+
+#### Exemples
+
+```bash
+curl "http://localhost:3000/nextTrains?stopId=43082"
+```
+
+#### Reponse 200 (exemple)
+
+```json
+{
+  "stopId": "43082",
+  "arrname": "Nom de l'arret",
+  "accessible": "...",
+  "geopoint": "...",
+  "nextTrains": [
+    {
+      "line": "...",
+      "direction": "...",
+      "destination": "...",
+      "mission": "...",
+      "trainNum": "...",
+      "vehicleFeatures": "...",
+      "journeyRed": "...",
+      "quai": "...",
+      "times": {
+        "st": {
+          "arrival": "...",
+          "departure": "..."
+        },
+        "rt": {
+          "arrival": "...",
+          "departure": "..."
+        }
+      },
+      "aQuai": false,
+      "status": "..."
+    }
+  ]
+}
+```
+
+#### Erreurs
+
+- `400`: `{"error":"Parametre stopId requis."}`
+- `500`: `{"error":"Erreur lors de la recuperation des donnees."}`
+
+---
+
+## Fonctionnement
+
+1. Validation de `stopId`.
+2. Lecture du cache `js/cache/IDFM:<stopId>.json`.
+3. Si le cache a moins de 60 secondes, reponse depuis cache.
+4. Sinon, appel a PRIM (`/marketplace/stop-monitoring`) avec `MonitoringRef=STIF:StopArea:SP:<stopId>:`.
+5. Mapping des `MonitoredStopVisit` vers le format HORIZN.
+6. Enrichissement avec les metadonnees d'arret (`arrname`, `accessible`, `geopoint`).
+7. Ecriture de la reponse brute PRIM en cache.
+
+---
+
+## Cache
+
+- Dossier: `js/cache`
+- Strategie: un fichier par arret (`IDFM:<stopId>.json`)
+- TTL: 60 secondes
+
+Objectif: reduire la latence et le volume d'appels vers PRIM.
+
+---
+
+## Monitoring
+
+Le dossier `js/monitoring` contient :
+- `monitor.js`: verifie l'endpoint `/nextTrains` et envoie des alertes Discord en cas d'erreur,
+- `testWebhook.js`: teste l'envoi vers le webhook Discord.
+
+---
+
+## Notes de securite
+
+La cle API PRIM et l'URL webhook Discord sont actuellement en dur dans le code. Pour un usage production, il est recommande de les externaliser via variables d'environnement.
+
+---
+
+## Limitations connues
+
+- Incoherence entre `npm start` (qui vise `js/index.js`) et le fichier disponible (`js/index2.js`).
+- Le chemin du fichier d'arrets est absolu et specifique a un environnement serveur.
+- Le champ `geopoint` est present en mode live mais pas dans la reponse issue du cache.
+
