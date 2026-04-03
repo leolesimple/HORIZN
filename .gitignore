@@ -1,9 +1,13 @@
 .DS_Store
 node_modules/
-js/index.js
 .vscode/
 .idea/
 appeal.log
 js/primData.json
 arrets-stopPoint.json
 js/gtfsParser.js
+data/
+.env
+js/cache/
+db/
+/.env.example
