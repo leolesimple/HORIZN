@@ -8,6 +8,7 @@ const path       = require('path');
 
 const departures = require('./services/DeparturesService');
 const gtfs       = require('./services/GTFSService');
+const traffic    = require('./services/TrafficService');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -161,6 +162,51 @@ app.get('/timetable', (req, res) => {
   } catch (err) {
     console.error(`[ERROR] /timetable stopId=${stopId}: ${err.message}`);
     res.status(500).json({ error: 'Erreur lors de la récupération des horaires.' });
+  }
+});
+
+// ---------- GET /traffic ----------
+// Infos trafic PRIM pour une ligne ou un arrêt.
+//
+// Paramètres :
+//   lineRef  – ID technique IDFM (ex: C01371 pour Métro 1, C01740 pour RER C)
+//   stopId   – ID d'arrêt (réservé – nécessite un mapping arrêt → lignes)
+//   channel  – "Perturbation" (défaut) | "Information" | "Commercial" | "InfoChannelRef_ALL"
+//
+app.get('/traffic', async (req, res) => {
+  const { lineRef, stopId, channel } = req.query;
+
+  if (!lineRef && !stopId) {
+    return res.status(400).json({
+      error: "Paramètre 'lineRef' ou 'stopId' requis.",
+      hint:  "Ex: /traffic?lineRef=C01371 (Métro 1) ou /traffic?lineRef=C01740 (RER C)",
+    });
+  }
+
+  // Le General Message PRIM n'accepte que LineRef (pas MonitoringRef).
+  // Pour un stopId il faudra d'abord résoudre les lignes qui desservent l'arrêt.
+  if (stopId && !lineRef) {
+    return res.status(400).json({
+      error: "Le paramètre 'stopId' nécessite une résolution arrêt → lignes (non implémenté).",
+      hint:  "Utilisez 'lineRef' pour le moment, ou passez les deux paramètres.",
+    });
+  }
+
+  try {
+    const messages = await traffic.getLineTraffic(lineRef, { channel });
+
+    res.json({
+      lineRef,
+      channel: channel || 'Perturbation',
+      count:   messages.length,
+      messages,
+    });
+  } catch (err) {
+    console.error(`[ERROR] /traffic lineRef=${lineRef}: ${err.message}`);
+    res.status(502).json({
+      error: 'Erreur lors de la récupération des informations trafic.',
+      detail: err.message,
+    });
   }
 });
 
