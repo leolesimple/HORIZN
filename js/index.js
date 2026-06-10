@@ -73,9 +73,18 @@ app.use((req, res, next) => {
 
 // ---------- GET /next | /nextTrains ----------
 // Retourne les départs fusionnés GTFS + PRIM sur une fenêtre de H+5 (par défaut).
+//
+// Paramètres :
+//   stopId    – ID d'arrêt (zdaid, ex: DU496 pour La Défense)
+//   stopArea  – ID stop_area pour traffic/equipments (ex: 71135). Défaut = stopId
+//   full      – Si "true", inclut aussi traffic + equipments de la gare
+//   horizon   – Fenêtre en heures (max 12, défaut 5)
+//   includeGTFS – Inclure les horaires GTFS statiques (défaut: true)
 
 const nextTrainsHandler = async (req, res) => {
-  const stopId = req.query.stopId;
+  const stopId      = req.query.stopId;
+  const stopArea    = req.query.stopArea || stopId; // fallback: stopId = stopArea
+  const full        = req.query.full === 'true';
   if (!stopId) return res.status(400).json({ error: 'Paramètre stopId requis.' });
 
   const includeGTFS = req.query.includeGTFS !== 'false';
@@ -83,11 +92,13 @@ const nextTrainsHandler = async (req, res) => {
   const useCache    = req.query.cache !== 'false';
 
   try {
-    const nextTrains = await departures.getNextDepartures(stopId, {
-      includeGTFS,
-      horizon,
-      useCache,
-    });
+    const [nextTrains, trafficData, equipmentData] = await Promise.all([
+      departures.getNextDepartures(stopId, { includeGTFS, horizon, useCache }),
+
+      full ? traffic.getLineTraffic(null, stopArea) : Promise.resolve(null),
+
+      full ? equipment.getEquipmentStatus(stopArea) : Promise.resolve(null),
+    ]);
 
     if (!nextTrains) {
       return res.status(404).json({ error: 'Aucune donnée disponible pour cet arrêt.' });
@@ -95,14 +106,21 @@ const nextTrainsHandler = async (req, res) => {
 
     const stopMeta = stopsMap.find(s => s.zdaid === stopId) || {};
 
-    res.json({
+    const payload = {
       stopId,
       stopName:   stopMeta.arrname          || null,
       accessible: stopMeta.arraccessibility === 'true',
       geopoint:   stopMeta.arrgeopoint      || null,
       horizon,
       departures: nextTrains,
-    });
+    };
+
+    if (full) {
+      payload.traffic    = { count: trafficData.length,    messages: trafficData };
+      payload.equipments = { count: equipmentData.length, equipments: equipmentData };
+    }
+
+    res.json(payload);
   } catch (err) {
     console.error(`[ERROR] /next stopId=${stopId}: ${err.message}`);
     res.status(500).json({ error: 'Erreur lors de la récupération des données.' });
