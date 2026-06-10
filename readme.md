@@ -6,6 +6,21 @@ Une API Node.js/Express qui consolide **PRIM (SIRI + Navitia)**, **GTFS statique
 
 ---
 
+## 📡 Tableau de bord rapide
+
+| Endpoint | Description | Paramètre clé | Cache |
+|----------|-------------|--------------|-------|
+| `GET /next` | Prochains passages temps réel | `stopId=DU496` | 60s |
+| `GET /nextTrains` | Alias de `/next` | `stopId=DU496` | 60s |
+| `GET /timetable` | Horaires GTFS complets journée | `stopId=DU496&date=2026-06-10` | fichier |
+| `GET /traffic` | Perturbations par ligne/arrêt | `lineRef=C01739` ou `stopId=71135` | 5 min |
+| `GET /search` | Recherche d'arrêts par nom | `q=austerlitz` | aucun |
+| `GET /equipments` | Pannes d'ascenseurs/escalators | `stopId=71135` | 5 min |
+
+**Modes combinés :** `/next?stopId=DU496&full=true` → départs **+** perturbations **+** équipements en 1 appel.
+
+---
+
 ## 🔥 Quick Start
 
 ```bash
@@ -221,74 +236,124 @@ curl "http://localhost:3000/equipments?stopId=71135"
 
 ## 🗺️ Géo-référencement (GEO)
 
-### Identifiants de transport
+### Identifiants de transport — résumé
 
 Chaque entité du réseau IDFM possède plusieurs IDs selon le contexte :
 
-| Entité | Format PRIM | Exemple |
-|--------|-------------|---------|
-| **Ligne** | `line:IDFM:C0XXXX` / `STIF:Line::C0XXXX:` | `C01739` = Transilien J |
-| **Arrêt (zdaid)** | `STIF:StopArea:SP:XXXX:` | `DU496` = La Défense |
-| **Arrêt (stop_area)** | `stop_area:IDFM:XXXXX` | `71135` = Gare d'Austerlitz |
-| **Gare/Station** | `stop_area:IDFM:XXXXX` | `478505` = Juvisy |
-
-### Codes lignes par réseau
-
-```yaml
-RATP:
-  Métro 1:   C01371
-  Métro 2:   C01372
-  Métro 4:   C01374
-  Métro 14:  C01384
-  RER A:     C01742
-  Tram T1:   C01947
-
-SNCF / Transilien:
-  RER C:     C01727
-  RER D:     C01728
-  Transilien H: C01737
-  Transilien J: C01739
-  Transilien K: C01738
-  Transilien L: C01740
-  Transilien N: C01736
-  Transilien P: C01730
-  Transilien R: C01731
-  Transilien U: C01741
-```
+| Entité | Format | Exemple | Usage API |
+|--------|--------|---------|-----------|
+| **Ligne** | `C0XXXX` (court) / `line:IDFM:C0XXXX` (Navitia) | `C01739` = Transilien J | `/traffic?lineRef=C01739` |
+| **Arrêt (zdaid)** | `DUXXX` (5-6 car. alphanum) | `DU496` = La Défense | `/next?stopId=DU496` |
+| **Arrêt (stop_area)** | `stop_area:IDFM:XXXXX` ou `XXXXX` seul | `71135` = Gare d'Austerlitz | `/traffic?stopId=71135` |
+| **Coordonnées** | WGS84 (lon, lat) ou EPSG:2154 (X, Y) | `2.238, 48.892` | Retourné dans les réponses |
 
 ### Sources des données
 
-| Source | Coverage | Endpoint | Cache |
-|--------|----------|----------|-------|
-| **PRIM StopMonitoring** | Temps réel toutes lignes | `/marketplace/stop-monitoring` | 60s |
-| **PRIM disruptions_bulk** | Toutes perturbations RATP+SNCF+bus | `/marketplace/disruptions_bulk/disruptions/v2` | 5 min |
-| **Navitia places** | Recherche d'arrêts | `/marketplace/v2/navitia/places` | — |
-| **GTFS statique** | Horaires théoriques hors-ligne | Fichier local SQLite | fichier |
-| **Référentiel arrêts** | Infos géo (nom, ville, coords) | `arrets-stopPoint.json` | fichier |
+| Source | Coverage | Endpoint | Cache | Taille typique |
+|--------|----------|----------|-------|----------------|
+| **PRIM StopMonitoring** | Temps réel toutes lignes | `/marketplace/stop-monitoring` | 60s | 5-50 Ko |
+| **PRIM disruptions_bulk** | Toutes perturbations RATP+SNCF+bus | `/marketplace/disruptions_bulk/disruptions/v2` | 5 min | ~1.5 Mo (919 entrées) |
+| **Navitia places** | Recherche d'arrêts | `/marketplace/v2/navitia/places` | — | — |
+| **GTFS statique** | Horaires théoriques hors-ligne | Fichier local SQLite | fichier | dépend du dataset |
+| **Référentiel arrêts** | Infos géo (nom, ville, coords) | `arrets-stopPoint.json` | fichier | ~18 Mo (30 000 arrêts) |
+
+### Référence complète
+
+Voir [`docs/GEO.md`](docs/GEO.md) pour :
+- **Table complète des lignes** (Métro, RER, Tramway, Transilien)
+- **Schéma détaillé du fichier arrêts** (30 champs documentés)
+- **Systèmes de coordonnées** (WGS84 ↔ Lambert 93 avec code de conversion)
+- **Zones tarifaires Navigo** (1-5)
+- **Mapping zdaid ↔ stop_area:IDFM**
+- **Prompt template prêt à copier pour LLM**
 
 ---
 
-## 🤖 IA-Friendly Design
+## 🤖 Guide Agent IA
 
-L'API est conçue pour être consommée par des agents LLM :
+HORIZN est conçu **pour les LLM** — réponses auto-suffisantes, identifiants chaînables, cache transparent.
 
-- **Réponses auto-suffisantes** : chaque endpoint documente ses propres paramètres et retours
-- **Identifiants cohérents** : `stop_area:IDFM:X` est réutilisé entre `/search`, `/traffic` et `/equipments`
-- **Parcours en chaîne** : la réponse de `/search` fournit directement les IDs à passer aux autres endpoints
-- **Cache transparent** : les délais de cache sont documentés pour que l'IA sache quand rafraîchir
-- **Format ISO** : dates en `YYYYMMDDThhmmss` (SIRI) ou `YYYY-MM-DD` (GTFS)
+### Principes de design
 
-### Parcours types pour agents LLM
+| Principe | Pourquoi |
+|----------|----------|
+| **Réponses auto-suffisantes** | Chaque réponse contient les infos nécessaires sans contexte externe |
+| **Identifiants croisés** | `stop_area:IDFM:X` est réutilisé entre `/search`, `/traffic` et `/equipments` |
+| **Chaînage direct** | Les IDs de `/search` s'injectent directement dans `/traffic` et `/equipments` |
+| **Cache documenté** | TTL connu pour décider quand rafraîchir |
+| **Dates ISO** | `YYYY-MM-DD` (GTFS) / `YYYYMMDDThhmmss` (SIRI) |
+| **403 clair** | Origine non autorisée → message explicite, pas un vague 403 |
+
+### Parcours types
 
 ```mermaid
-graph LR
-    A[search] -->|stopId| B[traffic]
-    A -->|stopId| C[equipments]
-    A -->|zdaid| D[next]
-    B -->|lineRef| B
-    D -->|full=true| B
-    D -->|full=true| C
+graph TD
+    A["🧑 Agent: recherche arrêt"] --> B[/search?q=]
+    B --> C{Type d'ID}
+    C -->|stop_area| D[/traffic?stopId=]
+    C -->|stop_area| E[/equipments?stopId=]
+    C -->|zdaid| F[/next?stopId=]
+    F -->|full=true| D
+    F -->|full=true| E
+    
+    G["🧑 Agent: infos ligne"] --> H[/traffic?lineRef=]
+    I["🧑 Agent: horaires"] --> J[/timetable?stopId=]
+    K["🧑 Agent: tout-en-un"] --> L[/next?stopId=&full=true]
 ```
+
+### Prompt template pour intégration LLM
+
+```markdown
+## Instructions agent transport IDF
+
+Tu as accès à l'API HORIZN sur {base_url}.
+
+### Résolution d'arrêt
+1. Si l'utilisateur donne un **nom d'arrêt**, appelle `/search?q={nom}`
+2. Extrais `stop_area:IDFM:X` de la réponse pour les appels suivants
+3. Cherche le `zdaid` via le fichier de référence pour les départs
+
+### Ordre des appels recommandé
+Pour une question comme « Y a-t-il des perturbations à Austerlitz ? » :
+1. `/search?q=austerlitz` → obtient `stop_area:IDFM:71135`
+2. `/traffic?stopId=71135` → perturbations
+3. `/equipments?stopId=71135` → pannes équipements
+
+Pour une question comme « Quand part le prochain train à La Défense ? » :
+1. `/next?stopId=DU496&full=true&horizon=2`
+   → départs + perturbations + équipements en un seul appel
+
+### Anti-patterns à éviter
+- ❌ Ne pas appeler `/traffic` sans `lineRef` ni `stopId` (400)
+- ❌ Ne pas utiliser `stop_area:IDFM:X` dans `/next` (utilise zdaid)
+- ❌ Ne pas appeler `/next` avec `full=false` si tu as aussi besoin de traffic/equipments
+- ❌ Ne pas rafraîchir `/traffic` plus d'une fois toutes les 5 minutes (cache)
+
+### Format des dates
+- Les dates GTFS sont en `HH:MM:SS` (heure de la journée)
+- Les dates PRIM en `YYYYMMDDThhmmss` (ISO sans séparateurs)
+- Le paramètre `date` de `/timetable` attend `YYYY-MM-DD`
+```
+
+### Exemples de questions utilisateur → appels API
+
+| Question utilisateur | Appel(s) API |
+|---------------------|--------------|
+| « Y a des problèmes sur le RER A ? » | `/traffic?lineRef=C01742` |
+| « Le métro 4 marche bien ? » | `/traffic?lineRef=C01374` |
+| « Des perturbations à Austerlitz ? » | `/search?q=austerlitz` → `/traffic?stopId=71135` |
+| « Prochain train à Saint-Lazare ? » | `/next?stopId=DU487&full=true&horizon=2` |
+| « Les horaires du Transilien J à Poissy demain ? » | `/timetable?stopId=DU870&date=2026-06-11` |
+| « Ascenseurs en panne à Montparnasse ? » | `/search?q=montparnasse` → `/equipments?stopId=8733803` |
+
+### Structure complète de l'architecture
+
+Voir [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) pour :
+- **Diagrammes de flux** détaillés (séquence, composants)
+- **Détail de chaque service** avec son algorithme
+- **Référence technique des endpoints** (status codes, headers)
+- **Sécurité et CORS**
+- **Déploiement et monitoring**
 
 ---
 
