@@ -14,31 +14,52 @@ let cache = {
 };
 
 /**
- * Récupère TOUTES les perturbations depuis l'API disruptions_bulk,
- * les met en cache, puis filtre par LineRef.
+ * Récupère les perturbations trafic pour une ligne et/ou un arrêt.
  *
  * L'API disruptions_bulk couvre l'INTÉGRALITÉ des lignes
  * (RATP + SNCF/Transilien + Bus), contrairement à general-message
  * qui ne couvre que le RATP.
  *
- * @param {string}  lineRef  – ID technique IDFM (ex: "C01371" pour Métro 1, "C01739" pour Transilien J)
+ * @param {string}  [lineRef] – ID technique IDFM (ex: "C01371" / "C01739")
+ * @param {string}  [stopId]  – ID d'arrêt IDFM (ex: "stop_area:IDFM:71135" ou "71135")
  * @param {object}  [opts]
  * @param {boolean} [opts.forceRefresh]  – Ignorer le cache
  * @returns {Promise<Array>}  Liste des perturbations formatées
  */
-async function getLineTraffic(lineRef, opts = {}) {
+async function getLineTraffic(lineRef, stopId, opts = {}) {
   // Recharger si le cache est expiré ou forcé
   const now = Date.now();
   if (!cache.data || opts.forceRefresh || (now - cache.fetchedAt) > CACHE_TTL_MS) {
     await _fetchAllDisruptions();
   }
 
-  // Filtrer par LineRef (format: line:IDFM:C0XXXX)
-  const targetId = `line:IDFM:${lineRef}`;
-  const matched  = cache.data.filter(d => {
-    const sections = d.impactedSections || [];
-    return sections.some(s => (s.lineId || '') === targetId);
-  });
+  let matched = cache.data;
+
+  // Filtre par ligne
+  if (lineRef) {
+    const targetId = `line:IDFM:${lineRef}`;
+    matched = matched.filter(d => {
+      const sections = d.impactedSections || [];
+      return sections.some(s => (s.lineId || '') === targetId);
+    });
+  }
+
+  // Filtre par arrêt (gare/station)
+  if (stopId) {
+    // Normaliser l'ID d'arrêt : accepter "71135" ou "stop_area:IDFM:71135"
+    const normalized = stopId.includes(':')
+      ? stopId
+      : `stop_area:IDFM:${stopId}`;
+
+    matched = matched.filter(d => {
+      const sections = d.impactedSections || [];
+      return sections.some(s => {
+        const fromId = s.from?.id || '';
+        const toId   = s.to?.id   || '';
+        return fromId === normalized || toId === normalized;
+      });
+    });
+  }
 
   return _normalize(matched);
 }
@@ -71,9 +92,11 @@ async function _fetchAllDisruptions() {
 function _normalize(rawList) {
   return rawList.map(d => {
     const sections = (d.impactedSections || []).map(s => ({
-      lineId: s.lineId || null,
-      from:   s.from?.name   || null,
-      to:     s.to?.name     || null,
+      lineId:   s.lineId     || null,
+      fromId:   s.from?.id   || null,
+      fromName: s.from?.name || null,
+      toId:     s.to?.id     || null,
+      toName:   s.to?.name   || null,
     }));
 
     // Périodes
