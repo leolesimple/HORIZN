@@ -166,39 +166,35 @@ app.get('/timetable', (req, res) => {
 });
 
 // ---------- GET /traffic ----------
-// Infos trafic PRIM pour une ligne (RATP + SNCF/Transilien + Bus).
+// Infos trafic PRIM pour une ligne et/ou un arrêt (RATP + SNCF/Transilien + Bus).
 //
 // Utilise l'API disruptions_bulk (couvre TOUTES les lignes IDFM).
 // Cache en mémoire 5 min pour éviter de re-télécharger 1.5 Mo à chaque requête.
 //
 // Paramètres :
 //   lineRef  – ID technique IDFM (ex: C01371 pour Métro 1, C01739 pour Transilien J)
-//   stopId   – Réservé (filtrage par arrêt à venir via impactedSections)
+//   stopId   – ID d'arrêt (ex: 71135 pour Gare d'Austerlitz, ou stop_area:IDFM:71135)
+//
+// Si les deux sont fournis, intersection des filtres (perturbations sur cette ligne
+// ET cet arrêt). Si stopId seul, toutes les perturbations concernant cet arrêt
+// toutes lignes confondues.
 //
 app.get('/traffic', async (req, res) => {
-  const { lineRef, stopId, channel } = req.query;
+  const { lineRef, stopId } = req.query;
 
   if (!lineRef && !stopId) {
     return res.status(400).json({
       error: "Paramètre 'lineRef' ou 'stopId' requis.",
-      hint:  "Ex: /traffic?lineRef=C01371 (Métro 1) ou /traffic?lineRef=C01740 (RER C)",
-    });
-  }
-
-  // Le General Message PRIM n'accepte que LineRef (pas MonitoringRef).
-  // Pour un stopId il faudra d'abord résoudre les lignes qui desservent l'arrêt.
-  if (stopId && !lineRef) {
-    return res.status(400).json({
-      error: "Le paramètre 'stopId' nécessite une résolution arrêt → lignes (non implémenté).",
-      hint:  "Utilisez 'lineRef' pour le moment, ou passez les deux paramètres.",
+      hint:  "Ex: /traffic?lineRef=C01739 (Transilien J) ou /traffic?stopId=71135 (Gare d'Austerlitz)",
     });
   }
 
   try {
-    const messages = await traffic.getLineTraffic(lineRef, { channel });
+    const messages = await traffic.getLineTraffic(lineRef, stopId);
 
     res.json({
-      lineRef,
+      lineRef: lineRef || null,
+      stopId:  stopId  || null,
       count:   messages.length,
       messages,
     });
