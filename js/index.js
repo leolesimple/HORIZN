@@ -166,12 +166,14 @@ app.get('/timetable', (req, res) => {
 });
 
 // ---------- GET /traffic ----------
-// Infos trafic PRIM pour une ligne ou un arrêt.
+// Infos trafic PRIM pour une ligne (RATP + SNCF/Transilien + Bus).
+//
+// Utilise l'API disruptions_bulk (couvre TOUTES les lignes IDFM).
+// Cache en mémoire 5 min pour éviter de re-télécharger 1.5 Mo à chaque requête.
 //
 // Paramètres :
-//   lineRef  – ID technique IDFM (ex: C01371 pour Métro 1, C01740 pour RER C)
-//   stopId   – ID d'arrêt (réservé – nécessite un mapping arrêt → lignes)
-//   channel  – "Perturbation" (défaut) | "Information" | "Commercial" | "InfoChannelRef_ALL"
+//   lineRef  – ID technique IDFM (ex: C01371 pour Métro 1, C01739 pour Transilien J)
+//   stopId   – Réservé (filtrage par arrêt à venir via impactedSections)
 //
 app.get('/traffic', async (req, res) => {
   const { lineRef, stopId, channel } = req.query;
@@ -197,7 +199,6 @@ app.get('/traffic', async (req, res) => {
 
     res.json({
       lineRef,
-      channel: channel || 'Perturbation',
       count:   messages.length,
       messages,
     });
