@@ -31,9 +31,38 @@ try {
   console.error(`[ERROR] Chargement des arrêts impossible (${STOPS_MAP_PATH}): ${err.message}`);
 }
 
-// CORS
+// Domaines autorisés
+const ALLOWED_ORIGINS = [
+  'https://infostation.fr',
+  'https://beta.infostation.fr',
+];
+
+// Validation de l'origine
+function isOriginAllowed(origin) {
+  if (!origin) return false;
+  try {
+    const url = new URL(origin);
+    return ALLOWED_ORIGINS.some(allowed => new URL(allowed).hostname === url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+// CORS + restriction d'origine
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  const referer = req.headers.referer;
+
+  // On check Origin d'abord, puis Referer en fallback (pour les requêtes directes)
+  const source = origin || referer;
+
+  if (source && !isOriginAllowed(source)) {
+    return res.status(403).json({ error: 'Origine non autorisée.' });
+  }
+
+  if (origin && isOriginAllowed(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
   res.header('Access-Control-Allow-Methods', 'GET');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   next();
