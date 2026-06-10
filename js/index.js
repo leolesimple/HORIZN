@@ -69,10 +69,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// ---------- GET /nextTrains ----------
+// ---------- GET /next | /nextTrains ----------
 // Retourne les départs fusionnés GTFS + PRIM sur une fenêtre de H+5 (par défaut).
 
-app.get('/nextTrains', async (req, res) => {
+const nextTrainsHandler = async (req, res) => {
   const stopId = req.query.stopId;
   if (!stopId) return res.status(400).json({ error: 'Paramètre stopId requis.' });
 
@@ -95,17 +95,20 @@ app.get('/nextTrains', async (req, res) => {
 
     res.json({
       stopId,
-      arrname:    stopMeta.arrname          || null,
-      accessible: stopMeta.arraccessibility || null,
+      stopName:   stopMeta.arrname          || null,
+      accessible: stopMeta.arraccessibility === 'true',
       geopoint:   stopMeta.arrgeopoint      || null,
       horizon,
-      nextTrains,
+      departures: nextTrains,
     });
   } catch (err) {
-    console.error(`[ERROR] /nextTrains stopId=${stopId}: ${err.message}`);
+    console.error(`[ERROR] /next stopId=${stopId}: ${err.message}`);
     res.status(500).json({ error: 'Erreur lors de la récupération des données.' });
   }
-});
+};
+
+app.get('/next',      nextTrainsHandler);
+app.get('/nextTrains', nextTrainsHandler);
 
 // ---------- GET /timetable ----------
 // Retourne tous les horaires GTFS statiques de la journée entière pour un arrêt.
