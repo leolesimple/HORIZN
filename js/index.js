@@ -9,6 +9,8 @@ const path       = require('path');
 const departures = require('./services/DeparturesService');
 const gtfs       = require('./services/GTFSService');
 const traffic    = require('./services/TrafficService');
+const search     = require('./services/SearchService');
+const equipment  = require('./services/EquipmentService');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -207,6 +209,52 @@ app.get('/traffic', async (req, res) => {
       error: 'Erreur lors de la récupération des informations trafic.',
       detail: err.message,
     });
+  }
+});
+
+// ---------- GET /search ----------
+// Recherche d'arrêts/gares par nom.
+//
+// Paramètres :
+//   q       – Texte de recherche (ex: "austerlitz", "la défense")
+//   count   – Max résultats (défaut: 10)
+//
+app.get('/search', async (req, res) => {
+  const q     = req.query.q;
+  const count = Math.min(parseInt(req.query.count || '10', 10), 50);
+
+  if (!q || q.length < 2) {
+    return res.status(400).json({ error: 'Paramètre "q" requis (min 2 caractères).' });
+  }
+
+  try {
+    const results = await search.search(q, { count });
+    res.json({ query: q, count: results.length, results });
+  } catch (err) {
+    console.error(`[ERROR] /search q=${q}: ${err.message}`);
+    res.status(502).json({ error: 'Erreur lors de la recherche.', detail: err.message });
+  }
+});
+
+// ---------- GET /equipments ----------
+// Pannes d'équipements (ascenseurs, escalators).
+//
+// Paramètres :
+//   stopId  – Optionnel : filtrer par arrêt (ex: 71135 ou stop_area:IDFM:71135)
+//
+app.get('/equipments', async (req, res) => {
+  const { stopId } = req.query;
+
+  try {
+    const items = await equipment.getEquipmentStatus(stopId);
+    res.json({
+      stopId:  stopId || null,
+      count:   items.length,
+      equipments: items,
+    });
+  } catch (err) {
+    console.error(`[ERROR] /equipments stopId=${stopId}: ${err.message}`);
+    res.status(502).json({ error: 'Erreur lors de la récupération des équipements.', detail: err.message });
   }
 });
 
