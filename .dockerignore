@@ -1,0 +1,8 @@
+node_modules
+.git
+json/arrets-stopPoint.json
+docs
+readme.md
+README.md
+*.md
+.env

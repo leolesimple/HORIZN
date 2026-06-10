@@ -5,7 +5,7 @@ const axios = require('axios');
 const API_KEY      = process.env.PRIM_API_KEY || 'SA2gwXmU8tMANuVvb1cei7oQc3FjEGOQ';
 const PRIM_BASE    = 'https://prim.iledefrance-mobilites.fr/marketplace';
 const TIMEOUT_MS   = 15000;
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL_MS = 90 * 1000; // 1 minute 30
 
 // Cache en mémoire
 let cache = {

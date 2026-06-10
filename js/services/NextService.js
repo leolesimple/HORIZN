@@ -7,7 +7,7 @@ const path   = require('path');
 const API_KEY    = process.env.PRIM_API_KEY || 'SA2gwXmU8tMANuVvb1cei7oQc3FjEGOQ';
 const PRIM_BASE  = 'https://prim.iledefrance-mobilites.fr/marketplace';
 const TIMEOUT_MS = 8000;
-const CACHE_TTL  = 60; // secondes
+const CACHE_TTL  = 30; // secondes
 
 const STOPS_MAP_PATH = process.env.STOPS_MAP_PATH
   || path.join(__dirname, '..', '..', 'json', 'arrets-stopPoint.json');

@@ -1,10 +1,14 @@
 'use strict';
 
-const axios = require('axios');
+const axios  = require('axios');
 
 const API_KEY      = process.env.PRIM_API_KEY || 'SA2gwXmU8tMANuVvb1cei7oQc3FjEGOQ';
 const NAVITIA_BASE = 'https://prim.iledefrance-mobilites.fr/marketplace/v2/navitia';
 const TIMEOUT_MS   = 8000;
+const CACHE_TTL_MS = 24 * 3600 * 1000; // 24 heures (les arrêts bougent rarement)
+
+// Cache en mémoire { query: { data, ts } }
+const cache = {};
 
 /**
  * Recherche des arrêts/gares/lieux par nom.
@@ -16,6 +20,14 @@ const TIMEOUT_MS   = 8000;
  */
 async function search(query, opts = {}) {
   const count = opts.count || 10;
+
+  // Vérifier le cache
+  const cacheKey = `${query}:${count}`;
+  const cached = cache[cacheKey];
+  const now = Date.now();
+  if (cached && (now - cached.ts) < CACHE_TTL_MS) {
+    return cached.data;
+  }
 
   const resp = await axios.get(`${NAVITIA_BASE}/places`, {
     params: {
@@ -32,7 +44,7 @@ async function search(query, opts = {}) {
 
   const places = resp.data?.places || [];
 
-  return places.map(p => ({
+  const results = places.map(p => ({
     id:        p.id || null,
     name:      p.name || null,
     stopArea: {
@@ -47,6 +59,11 @@ async function search(query, opts = {}) {
     distance: p.distance || null,
     quality:  p.quality || null,
   }));
+
+  // Mettre en cache
+  cache[cacheKey] = { data: results, ts: now };
+
+  return results;
 }
 
 module.exports = { search };

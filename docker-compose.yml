@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  horizn:
+    build: .
+    container_name: horizn
+    ports:
+      - "3003:3003"
+    volumes:
+      - ./json:/app/json:ro
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    environment:
+      - PORT=3003
+    networks:
+      - heartbeat-net
+    restart: unless-stopped
+
+networks:
+  heartbeat-net:
+    external: true
