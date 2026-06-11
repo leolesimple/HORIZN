@@ -28,7 +28,7 @@ class DeparturesService {
     let primOk     = false;
 
     if (useCache) {
-      const cached = cache.get(`IDFM:${stopId}`, 60);
+      const cached = cache.get(`IDFM:${stopId}`, 30);
       if (cached) {
         primVisits = _extractVisits(cached);
         primOk     = true;

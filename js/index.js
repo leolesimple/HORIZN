@@ -6,6 +6,7 @@ const express    = require('express');
 const fs         = require('fs');
 const path       = require('path');
 
+const logger     = require('./services/LoggerService');
 const departures = require('./services/DeparturesService');
 const gtfs       = require('./services/GTFSService');
 const traffic    = require('./services/TrafficService');
@@ -68,6 +69,25 @@ app.use((req, res, next) => {
   }
   res.header('Access-Control-Allow-Methods', 'GET');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+});
+
+// ---------- Logging ----------
+// Enregistre chaque requête dans data/logs/YYYY-MM-DD.jsonl
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    logger.log({
+      ts:       new Date().toISOString(),
+      method:   req.method,
+      path:     req.path,
+      query:    req.query,
+      status:   res.statusCode,
+      duration: Date.now() - start,
+      ip:       req.ip || req.connection?.remoteAddress || null,
+      ua:       req.headers['user-agent'] || null,
+    });
+  });
   next();
 });
 
