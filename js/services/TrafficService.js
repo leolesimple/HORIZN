@@ -1,17 +1,13 @@
 'use strict';
 
-const axios = require('axios');
+const axios        = require('axios');
+const cacheService = require('./CacheService');
 
-const API_KEY      = process.env.PRIM_API_KEY || 'SA2gwXmU8tMANuVvb1cei7oQc3FjEGOQ';
-const PRIM_BASE    = 'https://prim.iledefrance-mobilites.fr/marketplace';
-const TIMEOUT_MS   = 15000;
-const CACHE_TTL_MS = 90 * 1000; // 1 minute 30
-
-// Cache en mémoire
-let cache = {
-  data:     null,
-  fetchedAt: 0,
-};
+const API_KEY        = process.env.PRIM_API_KEY || 'SA2gwXmU8tMANuVvb1cei7oQc3FjEGOQ';
+const PRIM_BASE      = 'https://prim.iledefrance-mobilites.fr/marketplace';
+const TIMEOUT_MS     = 15000;
+const CACHE_TTL_SEC  = 90; // 1 minute 30
+const CACHE_KEY      = 'disruptions_bulk';
 
 /**
  * Récupère les perturbations trafic pour une ligne et/ou un arrêt.
@@ -28,12 +24,11 @@ let cache = {
  */
 async function getLineTraffic(lineRef, stopId, opts = {}) {
   // Recharger si le cache est expiré ou forcé
-  const now = Date.now();
-  if (!cache.data || opts.forceRefresh || (now - cache.fetchedAt) > CACHE_TTL_MS) {
+  let matched = cacheService.get(CACHE_KEY, CACHE_TTL_SEC);
+  if (!matched || opts.forceRefresh) {
     await _fetchAllDisruptions();
+    matched = cacheService.get(CACHE_KEY, CACHE_TTL_SEC);
   }
-
-  let matched = cache.data;
 
   // Filtre par ligne
   if (lineRef) {
@@ -80,8 +75,7 @@ async function _fetchAllDisruptions() {
 
   const disruptions = resp.data?.disruptions || [];
 
-  cache.data     = disruptions;
-  cache.fetchedAt = Date.now();
+  cacheService.set(CACHE_KEY, disruptions);
 
   return disruptions;
 }
