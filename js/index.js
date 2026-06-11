@@ -365,9 +365,6 @@ app.get('/admin/health', (req, res) => {
   res.json(admin.getHealth());
 });
 
-// Serveur statique pour le dashboard HTML
-app.use('/admin', express.static(path.join(__dirname, '..', 'admin')));
-
 // ---------- Démarrage ----------
 
 app.listen(PORT, () => {
