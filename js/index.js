@@ -7,6 +7,7 @@ const fs         = require('fs');
 const path       = require('path');
 
 const logger     = require('./services/LoggerService');
+const admin      = require('./services/AdminService');
 const departures = require('./services/DeparturesService');
 const gtfs       = require('./services/GTFSService');
 const traffic    = require('./services/TrafficService');
@@ -295,6 +296,77 @@ app.get('/equipments', async (req, res) => {
     res.status(502).json({ error: 'Erreur lors de la récupération des équipements.', detail: err.message });
   }
 });
+
+// ---------- Routes Admin ----------
+
+const axios = require('axios');
+
+// GET /admin/horizn – tableau de bord complet
+app.get('/admin/horizn', async (req, res) => {
+  try {
+    // Tester PRIM en parallèle
+    let primOk = false;
+    try {
+      const primResp = await axios.get(
+        'https://prim.iledefrance-mobilites.fr/marketplace/disruptions_bulk/disruptions/v2',
+        {
+          headers: { accept: 'application/json', apikey: process.env.PRIM_API_KEY },
+          timeout: 5000,
+        }
+      );
+      primOk = primResp.status === 200;
+    } catch { /* PRIM indisponible */ }
+
+    const health = admin.getHealth();
+    health.primReachable = primOk;
+
+    res.json({
+      stats:        admin.getTodaysStats(),
+      cache:        admin.getCacheStatus(),
+      health,
+      recentLogs:   admin.getRecentLogs(20),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /admin/stats – métriques du jour
+app.get('/admin/stats', (req, res) => {
+  res.json(admin.getTodaysStats());
+});
+
+// GET /admin/logs – logs bruts avec filtres
+app.get('/admin/logs', (req, res) => {
+  const limit       = Math.min(parseInt(req.query.limit || '50', 10), 500);
+  const filterPath  = req.query.path || null;
+  const statusMin   = req.query.statusMin  ? parseInt(req.query.statusMin, 10)  : null;
+  const statusMax   = req.query.statusMax  ? parseInt(req.query.statusMax, 10)  : null;
+  const durationMin = req.query.durationMin ? parseInt(req.query.durationMin, 10) : null;
+  const since       = req.query.since || null;
+
+  let logs;
+  if (filterPath || statusMin != null || statusMax != null || durationMin != null) {
+    logs = admin.queryLogs({ path: filterPath, statusMin, statusMax, durationMin, limit });
+  } else {
+    logs = admin.getRecentLogs(limit, since);
+  }
+
+  res.json({ count: logs.length, logs });
+});
+
+// GET /admin/cache – état des caches
+app.get('/admin/cache', (req, res) => {
+  res.json(admin.getCacheStatus());
+});
+
+// GET /admin/health – santé du service
+app.get('/admin/health', (req, res) => {
+  res.json(admin.getHealth());
+});
+
+// Serveur statique pour le dashboard HTML
+app.use('/admin', express.static(path.join(__dirname, '..', 'admin')));
 
 // ---------- Démarrage ----------
 
