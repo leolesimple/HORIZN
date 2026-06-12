@@ -1,6 +1,6 @@
 {
   "name": "horizn",
-  "version": "2.0.0",
+  "version": "2.0.0-beta.1",
   "description": "HORIZN is a RESTful API engine for InfoStation, merging PRIM realtime and GTFS data.",
   "main": "js/index.js",
   "scripts": {
@@ -8,7 +8,8 @@
     "start": "node js/index.js",
     "dev": "nodemon js/index.js",
     "setup-gtfs": "node js/scripts/setupGTFS.js",
-    "migrate-stops": "node js/scripts/migrateStops.js"
+    "migrate-stops": "node js/scripts/migrateStops.js",
+    "keys": "node js/scripts/keys.js"
   },
   "private": true,
   "dependencies": {
@@ -19,6 +20,7 @@
     "depd": "^2.0.0",
     "dotenv": "^16.6.1",
     "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.2",
     "fs-extra": "^11.3.4",
     "JSONStream": "^1.3.5",
     "rate-limiter-flexible": "^10.0.1",

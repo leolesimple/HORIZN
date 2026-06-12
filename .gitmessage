@@ -1,0 +1,22 @@
+# Format des messages de commit — Conventional Commits
+# https://www.conventionalcommits.org/
+#
+# Structure :
+#   type(scope): description
+#
+# Types :
+#   feat     — Nouvelle fonctionnalité
+#   fix      — Correction de bug
+#   change   — Modification de comportement existant
+#   perf     — Amélioration de performance
+#   refactor — Réécriture sans changement fonctionnel
+#   docs     — Documentation
+#   chore    — Maintenance (CI, dépendances, config)
+#   style    — Formatage (espaces, points-virgules…)
+#   test     — Ajout ou modification de tests
+#
+# Exemples :
+#   feat(auth): ajout API keys et JWT
+#   fix(next): correction timeout PRIM
+#   perf(gtfs): import 10x plus rapide via .import
+#   docs(readme): mise à jour endpoints
