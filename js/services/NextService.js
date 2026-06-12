@@ -64,7 +64,7 @@ async function getNext(stopId) {
       direction:   mvj.DirectionRef?.value || null,
       destination: mvj.DestinationName?.[0]?.value || null,
       mission:     (mvj.JourneyNote || []).map(n => n.value).join(', ') || null,
-      trainNum:    mvj.TrainNumbers?.[0]?.value || null,
+      trainNum:    mvj.TrainNumbers?.TrainNumberRef?.[0]?.value || null,
       quai:        mc?.ArrivalPlatformName?.value || null,
       times: {
         scheduled: {

@@ -156,4 +156,4 @@ function _fmtDuration(sec) {
   return `${h}h ${m}m`;
 }
 
-module.exports = { getTodaysStats, getRecentLogs, queryLogs, getCacheStatus, getHealth };
+module.exports = { getTodaysStats, getRecentLogs, queryLogs, getCacheStatus, getHealth, STARTED_AT };
