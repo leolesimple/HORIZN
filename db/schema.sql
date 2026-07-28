@@ -31,8 +31,9 @@ CREATE TABLE IF NOT EXISTS stop_times (
   stop_sequence  INTEGER
 );
 
-CREATE INDEX IF NOT EXISTS idx_stop_times_trip ON stop_times(trip_id);
-CREATE INDEX IF NOT EXISTS idx_stop_times_stop ON stop_times(stop_id);
+-- Pas d'index sur stop_times ici : ils sont créés APRÈS le chargement en masse
+-- par setupGTFS.js (createIndexes). Les créer avant coûtait 2 insertions B-tree
+-- aléatoires par ligne sur 10,4M lignes = 66 % du temps d'import.
 
 CREATE TABLE IF NOT EXISTS calendar (
   service_id  TEXT PRIMARY KEY,
@@ -54,4 +55,4 @@ CREATE TABLE IF NOT EXISTS shapes (
   shape_pt_sequence INTEGER
 );
 
-CREATE INDEX IF NOT EXISTS idx_shapes_id ON shapes(shape_id);
+-- idem : voir createIndexes() dans setupGTFS.js
