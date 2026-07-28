@@ -10,7 +10,9 @@ if ! docker ps --format '{{.Names}}' | grep -q '^horizn$'; then
   exit 1
 fi
 
-OUTPUT=$(docker exec horizn node js/scripts/setupGTFS.js 2>&1)
+# L'import est mono-thread (~1 core mesuré) mais sature l'I/O disque.
+# nice/ionice le laisse céder la place aux autres conteneurs du NUC.
+OUTPUT=$(docker exec horizn nice -n 19 node js/scripts/setupGTFS.js 2>&1)
 EXIT_CODE=$?
 
 echo "[$TIMESTAMP] $OUTPUT" >> data/gtfs-refresh.log

@@ -5,6 +5,40 @@ Toutes les modifications notables de HORIZN sont documentées ici.
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et ce projet suit [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Non publié]
+
+### Performance
+
+- `perf(gtfs)` — Import 3,3× plus rapide et 2,3× moins gourmand en RAM
+  (mesuré sur 9M lignes : 134s → 41s, 620 Mo → 264 Mo de pic RSS).
+  - Les index sur `stop_times` ne sont plus créés par `schema.sql` **avant** le
+    chargement en masse : ils étaient maintenus à chaque insertion, soit 66 % du
+    temps d'import. Ils sont construits une fois après, par `createIndexes()`.
+  - Suppression de deux index en double sur `stop_times` (`idx_stop_times_trip_id`
+    et `idx_stop_times_stop_id` faisaient doublon avec ceux de `schema.sql`) :
+    base 31 % plus petite (~2,7 Go → ~1,9 Go).
+  - Insertion au fil de l'eau dans une transaction longue au lieu de lots de
+    50 000 objets JS : plus d'allocation d'un objet par ligne (10,4M objets).
+  - Parsing CSV dédié en remplacement de `csv-parser` sur ce chemin, avec chemin
+    rapide sans guillemet et résolution des colonnes une seule fois.
+  - `cache_size` ramené de 256 Mo à 64 Mo et `temp_store` passé de `MEMORY` à
+    `FILE` : la mémoire ne croît plus avec le volume de données.
+  - Hash SHA256 du ZIP en streaming au lieu de `readFileSync` (évitait un Buffer
+    de la taille du ZIP, ~1 Go en production).
+
+### Corrigé
+
+- `fix(gtfs)` — `rebuildDB()` n'était pas attendu (`await` manquant) : sur une
+  installation vierge, `statSync` sur la base inexistante levait une erreur et
+  `process.exit(1)` tuait l'import en cours. L'import à froid fonctionne.
+- `fix(gtfs)` — Le hash du ZIP était écrit *avant* la fin de l'import : un run
+  interrompu (OOM kill, timeout) était considéré comme réussi et le run suivant
+  le skippait. Il n'est désormais écrit qu'après succès.
+- `fix(gtfs)` — Les erreurs de lecture du ZIP étaient avalées
+  (`.on('error', err => resolve(count))`) : une archive tronquée produisait une
+  base partielle, swappée en production et marquée comme valide. L'erreur est
+  maintenant propagée, l'ancienne base est conservée.
+
 ## [2.0.0-beta.1] — 2026-06-11
 
 Première version beta de HORIZN, remplaçant l'ancien ISA (Infostation API v1.2).

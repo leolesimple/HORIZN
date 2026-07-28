@@ -333,10 +333,29 @@ docker exec horizn node js/scripts/setupGTFS.js
 ```
 
 - Téléchargement si ZIP > 24h
-- Hash SHA256 pour détecter les changements
+- Hash SHA256 (streaming) pour détecter les changements
 - Skip si inchangé (0.2s)
-- Import full : ~118s pour 10.4M stop_times (2.7 GB)
+- Import full : ~40s pour 10.4M stop_times (~1,9 GB) — mono-thread, ~260 Mo RSS
 - Swap atomique (`*.tmp` + `renameSync`) : 0 downtime
+- Le hash n'est écrit qu'après succès : un run interrompu est rejoué
+
+#### Profil de charge (mesuré, jeu synthétique 9M lignes)
+
+| | avant | après |
+|---|---|---|
+| Wall | 134 s | 41 s |
+| CPU | 141 s | 43 s |
+| Pic RSS | 620 Mo | 264 Mo |
+| Taille DB | 1431 Mo | 988 Mo |
+
+L'import n'utilise qu'**un seul cœur** (~1,05 mesuré) : ce n'est pas un traitement
+parallèle. La RAM ne croît plus avec le nombre de lignes (cache SQLite borné à
+64 Mo + `temp_store=FILE`), donc pas de risque d'OOM quand IDFM grossit.
+
+Le coût dominant était la maintenance des index pendant le chargement : `schema.sql`
+créait les index sur `stop_times` **avant** l'insertion (2 insertions B-tree
+aléatoires × 10,4M lignes = 66 % du temps). Ils sont désormais construits une seule
+fois après le chargement, par `createIndexes()`.
 
 ### Cron
 
@@ -345,6 +364,11 @@ docker exec horizn node js/scripts/setupGTFS.js
 ```
 
 Lancé en détaché (`docker exec -d`) — retour immédiat, pas de timeout.
+
+⚠️ Le garde-fou « ZIP > 24h » de `downloadIfStale()` fait que **seul le run de 8h05
+travaille réellement** : à 13h05 et 17h05 le ZIP local a moins de 24h, aucun
+téléchargement n'a lieu, le hash est identique et l'import est skippé (0,2s).
+La fréquence effective est donc de 1 import/jour, à l'heure de pointe du matin.
 
 ---
 
