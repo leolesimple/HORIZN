@@ -55,8 +55,8 @@ HORIZN/
 3. CORS                  ← Restriction d'origine (infostation.fr, beta.infostation.fr)
 4. Request ID            ← X-Request-ID (généré ou transmis)
 5. Logging               ← JSON lines (LoggerService)
-6. Rate Limiting         ← Par route (rateLimitPublic, rateLimitSearch, rateLimitNext, rateLimitAdmin)
-7. Auth                  ← requireFrontend / requireAdmin (API keys + JWT)
+6. Rate Limiting         ← Par classe de route + par clé API (sha256(clé), fallback IP si clé inconnue)
+7. Auth                  ← requireFrontend / requireAdmin (API keys + JWT) + KeyUsageService.record()
 8. Route handlers         ← /next, /traffic, /search, /equipments, /timetable, /status, /admin/*
 ```
 
@@ -261,6 +261,17 @@ Stats, logs, cache, health pour les routes admin.
 - `getCacheStatus()` → état du cache fichier (taille, âge, fichiers)
 - `getHealth()` → uptime, GTFS disponible
 
+### 4.9 KeyUsageService.js
+
+Suivi de la dernière utilisation des clés API.
+
+- `record(key)` → accumule un delta en mémoire (appelé par le middleware auth à chaque requête acceptée)
+- `flush()` → merge du delta dans `data/api_keys.json` (relecture + write atomique tmp/rename) ; synchrone
+- `start()` / `stop()` → timer de flush 30 s (`unref`), pilotés par `js/index.js` (boot / shutdown)
+- `report()` → inventaire des clés (aperçu masqué) + quota temps réel (`rateLimit.getUsage`) pour `GET /admin/keys`
+
+Champs persistés par clé : `lastUsedAt` (ISO 8601), `usageCount`. Les clés `.env` sont suivies en mémoire uniquement.
+
 ---
 
 ## 5. Authentification
@@ -270,7 +281,11 @@ Stats, logs, cache, health pour les routes admin.
 1. **`.env`** — `FRONTEND_API_KEY`, `ADMIN_API_KEY` (fallback)
 2. **`data/api_keys.json`** — clés managées via `npm run keys`
 
-Le middleware auth recharge le fichier à chaud si modifié (stat check).
+Le middleware auth recharge le fichier à chaud si modifié (stat check). Chemin surchargeable via `API_KEYS_FILE`.
+
+Chaque requête acceptée est enregistrée par `KeyUsageService` (`lastUsedAt`, `usageCount`, flush différé
+dans `data/api_keys.json`). `GET /admin/keys` — et le bloc `keys` de `GET /admin/horizn` — exposent
+l'inventaire (aperçu masqué), la dernière utilisation et la consommation de quota en temps réel.
 
 ### Niveaux
 
