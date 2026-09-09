@@ -21,7 +21,10 @@ const fs   = require('fs');
 const path = require('path');
 const jwt  = require('jsonwebtoken');
 
-const KEYS_FILE = path.join(__dirname, '..', '..', 'data', 'api_keys.json');
+const keyUsage = require('../services/KeyUsageService');
+
+const KEYS_FILE = process.env.API_KEYS_FILE
+  || path.join(__dirname, '..', '..', 'data', 'api_keys.json');
 
 // Cache des clés depuis le fichier
 let _fileKeys = null;
@@ -62,6 +65,7 @@ function getAllKeys() {
 
 /**
  * Vérifie une API key et retourne son rôle ('admin', 'frontend') ou null.
+ * Enregistre l'utilisation de la clé (KeyUsageService) si elle est valide.
  */
 function checkApiKey(req) {
   const key = req.headers['x-api-key'];
@@ -69,9 +73,21 @@ function checkApiKey(req) {
 
   const all = getAllKeys();
   for (const k of all) {
-    if (k.key === key) return k.role;
+    if (k.key === key) {
+      keyUsage.record(key);
+      return k.role;
+    }
   }
   return null;
+}
+
+/**
+ * Indique si une clé API est connue (env ou fichier), sans effet de bord.
+ * Utilisé par le rate limiting pour décider du quota (par clé vs par IP).
+ */
+function isKnownKey(key) {
+  if (!key) return false;
+  return getAllKeys().some(k => k.key === key);
 }
 
 /**
@@ -126,4 +142,4 @@ function optionalAuth(req, res, next) {
   next();
 }
 
-module.exports = { requireAdmin, requireFrontend, optionalAuth };
+module.exports = { requireAdmin, requireFrontend, optionalAuth, isKnownKey };
