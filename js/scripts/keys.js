@@ -15,7 +15,8 @@ const fs   = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const KEYS_FILE = path.join(__dirname, '..', '..', 'data', 'api_keys.json');
+const KEYS_FILE = process.env.API_KEYS_FILE
+  || path.join(__dirname, '..', '..', 'data', 'api_keys.json');
 
 // ---------- Stockage ----------
 
@@ -40,6 +41,20 @@ function generateKey() {
   return 'hzn_' + crypto.randomBytes(20).toString('hex');
 }
 
+/** "il y a 3 min" / "jamais" à partir d'un ISO 8601. */
+function relTime(iso) {
+  if (!iso) return 'jamais';
+  const diff = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(diff)) return 'jamais';
+  const s = Math.round(diff / 1000);
+  if (s < 60) return `il y a ${s}s`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `il y a ${m} min`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `il y a ${h} h`;
+  return `il y a ${Math.round(h / 24)} j`;
+}
+
 // ---------- Commandes ----------
 
 function cmdList() {
@@ -50,15 +65,17 @@ function cmdList() {
   }
 
   console.log(`\n${keys.length} clé(s) API :\n`);
-  console.log('  RÔLE      DESCRIPTION                        CLÉ');
-  console.log('  ─────     ───────────                        ───');
+  console.log('  RÔLE      DESCRIPTION                        CLÉ                     DERNIÈRE UTIL.        UTIL.');
+  console.log('  ─────     ───────────                        ───                     ──────────────        ─────');
   for (const k of keys) {
-    const role = k.role.padEnd(10);
-    const name = (k.name || '').padEnd(35);
-    const key  = k.key.slice(0, 20) + '…' + k.key.slice(-4);
-    console.log(`  ${role} ${name} ${key}`);
+    const role  = k.role.padEnd(10);
+    const name  = (k.name || '').padEnd(35);
+    const key   = (k.key.slice(0, 12) + '…' + k.key.slice(-4)).padEnd(24);
+    const last  = relTime(k.lastUsedAt).padEnd(21);
+    const count = String(k.usageCount || 0);
+    console.log(`  ${role} ${name} ${key} ${last} ${count}`);
   }
-  console.log();
+  console.log('\n  Quota temps réel par clé : GET /admin/keys\n');
 }
 
 function cmdGenerate(role, name) {

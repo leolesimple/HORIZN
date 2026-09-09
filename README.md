@@ -35,11 +35,12 @@ Toutes les routes nécessitent une clé API dans le header `X-API-Key`.
 
 | Endpoint | Description | Rate limit |
 |----------|-------------|------------|
-| `GET /admin/horizn` | Dashboard complet (stats, cache, health) | 30/min |
+| `GET /admin/horizn` | Dashboard complet (stats, cache, health, clés) | 30/min |
 | `GET /admin/stats` | Métriques du jour | 30/min |
 | `GET /admin/logs` | Logs JSON avec filtres | 30/min |
 | `GET /admin/cache` | État des fichiers de cache | 30/min |
 | `GET /admin/health` | Santé du service | 30/min |
+| `GET /admin/keys` | Clés API : dernière utilisation, compteur, quota courant | 30/min |
 
 ### Sans auth
 
@@ -144,6 +145,47 @@ Cache : 90s (fichier, partagé avec `/traffic`).
 
 ---
 
+## `GET /admin/keys`
+
+Inventaire des clés API — clé admin requise. Les clés brutes ne sont jamais renvoyées (aperçu masqué).
+
+```json
+{
+  "generatedAt": "2026-06-11T14:00:00.000Z",
+  "count": 2,
+  "keys": [
+    {
+      "keyPreview": "hzn_1a2b3c4d…9f0e",
+      "role": "frontend",
+      "name": "infostation prod",
+      "source": "file",
+      "createdAt": "2026-05-01T09:00:00.000Z",
+      "lastUsedAt": "2026-06-11T13:59:58.000Z",
+      "lastUsedRelative": "il y a 2s",
+      "usageCount": 14203,
+      "quota": {
+        "next":   { "limit": 60, "consumed": 12, "remaining": 48, "usedPct": 20, "blocked": false, "resetInSeconds": 41 },
+        "search": { "limit": 20, "consumed": 0,  "remaining": 20, "usedPct": 0,  "blocked": false, "resetInSeconds": 0 },
+        "public": { "limit": 100, "consumed": 3, "remaining": 97, "usedPct": 3,  "blocked": false, "resetInSeconds": 22 },
+        "admin":  { "limit": 30, "consumed": 0,  "remaining": 30, "usedPct": 0,  "blocked": false, "resetInSeconds": 0 },
+        "worstPct": 20
+      }
+    }
+  ]
+}
+```
+
+| Champ | Description |
+|-------|-------------|
+| `source` | `file` (`data/api_keys.json`) ou `env` (`FRONTEND_API_KEY` / `ADMIN_API_KEY`, usage non persisté) |
+| `lastUsedAt` / `usageCount` | Dernière requête acceptée + total cumulé. Persistés (flush 30 s + arrêt) pour les clés `file` |
+| `quota.<classe>` | Consommation courante du rate limiter (`consumed`/`limit`), fenêtre glissante 60 s |
+| `quota.worstPct` | Classe la plus consommée — indicateur unique « % du quota » |
+
+Également inclus dans `GET /admin/horizn` sous la clé `keys`.
+
+---
+
 ## 🔐 Authentification
 
 Deux niveaux de clés API. Gérées via le fichier `data/api_keys.json`.
@@ -151,10 +193,14 @@ Deux niveaux de clés API. Gérées via le fichier `data/api_keys.json`.
 ### Gestion des clés
 
 ```bash
-npm run keys list                              # Lister
+npm run keys list                              # Lister (rôle, dernière utilisation, compteur)
 npm run keys generate -- --role frontend --name "infostation prod"  # Créer
 npm run keys revoke -- --name "infostation prod"                     # Révoquer
 ```
+
+Chaque requête acceptée met à jour `lastUsedAt` et `usageCount` dans `data/api_keys.json`
+(écriture différée : flush toutes les 30 s + à l'arrêt). `GET /admin/keys` ajoute la
+consommation de quota en temps réel par classe de route.
 
 ### Niveaux d'accès
 
@@ -168,6 +214,9 @@ Les clés définies dans `.env` (`FRONTEND_API_KEY`, `ADMIN_API_KEY`) servent de
 ---
 
 ## 🛡️ Rate Limiting
+
+Quota **par clé API** (indexé sur `sha256(clé)`). Les requêtes sans clé connue — donc rejetées
+par l'auth juste après — sont limitées par IP, ce qui protège contre le brute-force de clés.
 
 | Route | Limite | Blocage |
 |-------|--------|---------|
