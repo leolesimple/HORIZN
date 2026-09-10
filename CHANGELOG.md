@@ -5,6 +5,12 @@ Toutes les modifications notables de HORIZN sont documentées ici.
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et ce projet suit [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+La [ROADMAP](ROADMAP.md) liste ce qui est prévu.
+
+## [Non publié]
+
+_Rien pour le moment._
+
 ## [2.0.1] — 2026-09-10
 
 ### Ajouté
@@ -17,6 +23,20 @@ et ce projet suit [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Modifié
 
 - **Rate limiting par clé API** au lieu de par IP : le quota est indexé sur `sha256(clé)` pour les clés connues, avec repli sur l'IP pour les requêtes sans clé connue (avant auth, anti-brute-force). `js/middleware/rateLimit.js` expose `getUsage(key)` pour l'introspection.
+
+## [2.0.0] — 2026-09-08
+
+Première version **stable** de HORIZN — promotion de `2.0.0-beta.1` (périmètre
+fonctionnel identique, voir la section ci-dessous).
+
+### Corrigé
+
+- `fix(deps)` — résolution des vulnérabilités signalées par Dependabot (`npm audit`).
+
+### Ajouté
+
+- Workflow CI GitHub Actions (`.github/workflows/ci.yml`) : `npm audit`, `npm ls --all`,
+  `node --check` sur tout `js/`, smoke test `/health`, build de l'image Docker.
 
 ## [2.0.0-beta.1] — 2026-06-11
 
@@ -81,3 +101,10 @@ Fusion complète des données PRIM temps réel et GTFS statique.
 - API Navitia pour le Geocoding (places)
 - Authentification : fichier `data/api_keys.json` + JWT
 - Taux de requêtes : `rate-limiter-flexible` avec stockage fichier
+
+---
+
+[Non publié]: https://github.com/leolesimple/HORIZN/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/leolesimple/HORIZN/compare/v2.0.0...v2.0.1
+[2.0.0]: https://github.com/leolesimple/HORIZN/compare/v2.0.0-beta.1...v2.0.0
+[2.0.0-beta.1]: https://github.com/leolesimple/HORIZN/compare/v1.2.0...v2.0.0-beta.1
