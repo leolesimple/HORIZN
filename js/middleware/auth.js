@@ -29,11 +29,22 @@ const KEYS_FILE = process.env.API_KEYS_FILE
 // Cache des clés depuis le fichier
 let _fileKeys = null;
 let _fileKeysMtime = 0;
+let _fileKeysCheckedAt = 0;
+
+// getFileKeys() est sur le chemin chaud (auth + rate limiting, à chaque requête).
+// On ne fait le stat/reload qu'au plus une fois par seconde ; une nouvelle clé ou
+// une révocation prend donc effet en < 1 s.
+const FILE_KEYS_STAT_TTL_MS = 1000;
 
 /**
- * Recharge les clés du fichier uniquement si modifié.
+ * Recharge les clés du fichier uniquement si modifié (stat throttlé à 1 s).
  */
 function getFileKeys() {
+  const now = Date.now();
+  if (_fileKeys !== null && now - _fileKeysCheckedAt < FILE_KEYS_STAT_TTL_MS) {
+    return _fileKeys;
+  }
+  _fileKeysCheckedAt = now;
   try {
     const st = fs.statSync(KEYS_FILE);
     if (st.mtimeMs !== _fileKeysMtime) {

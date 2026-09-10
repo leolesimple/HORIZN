@@ -11,8 +11,14 @@
  *   node js/scripts/keys.js revoke --key "<la clé>"
  */
 
-const fs   = require('fs');
 const path = require('path');
+
+// Charger .env comme les autres scripts standalone (setupGTFS, migrateStops) :
+// sinon `API_KEYS_FILE` défini dans .env est ignoré par la CLI, qui opérerait
+// alors sur un fichier différent de celui du serveur.
+require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
+
+const fs   = require('fs');
 const crypto = require('crypto');
 
 const KEYS_FILE = process.env.API_KEYS_FILE
