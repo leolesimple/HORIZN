@@ -10,6 +10,7 @@ const Database   = require('better-sqlite3');
 
 const logger     = require('./services/LoggerService');
 const admin      = require('./services/AdminService');
+const keyUsage   = require('./services/KeyUsageService');
 const departures = require('./services/DeparturesService');
 const gtfs       = require('./services/GTFSService');
 const traffic    = require('./services/TrafficService');
@@ -382,6 +383,7 @@ app.get('/admin/horizn', rateLimitAdmin, requireAdmin, async (req, res) => {
       stats:        admin.getTodaysStats(),
       cache:        admin.getCacheStatus(),
       health,
+      keys:         await keyUsage.report(),
       recentLogs:   admin.getRecentLogs(20),
     });
   } catch (err) {
@@ -423,6 +425,16 @@ app.get('/admin/health', rateLimitAdmin, requireAdmin, (req, res) => {
   res.json(admin.getHealth());
 });
 
+// GET /admin/keys — inventaire des clés API : rôle, nom, dernière utilisation,
+// nombre d'utilisations, et consommation de quota en temps réel par classe de route.
+app.get('/admin/keys', rateLimitAdmin, requireAdmin, async (req, res) => {
+  try {
+    res.json(await keyUsage.report());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ========================================================================
 // DÉMARRAGE + GRACEFUL SHUTDOWN
 // ========================================================================
@@ -430,6 +442,7 @@ app.get('/admin/health', rateLimitAdmin, requireAdmin, (req, res) => {
 let server;
 
 function start() {
+  keyUsage.start();
   server = app.listen(PORT, () => {
     if (!QUIET_MODE) {
       console.log(`\n${HORIZN_ASCII}\n`);
@@ -448,6 +461,14 @@ function shutdown(signal) {
     // Stop d'accepter les nouvelles requêtes
     server.close(async () => {
       console.log('  ✔ Serveur HTTP arrêté');
+
+      // Persister la dernière utilisation des clés
+      try {
+        keyUsage.stop();
+        if (keyUsage.flush()) console.log('  ✔ Usage des clés persisté');
+      } catch (err) {
+        console.error('  ✗ Erreur flush usage clés:', err.message);
+      }
 
       // Fermer les connexions DB (GTFS)
       try {
@@ -468,6 +489,7 @@ function shutdown(signal) {
     // Force shutdown après 10s si le graceful échoue
     setTimeout(() => {
       console.error('  ⏱ Timeout 10s — arrêt forcé');
+      try { keyUsage.stop(); keyUsage.flush(); } catch { /* best effort */ }
       resolve();
       process.exit(1);
     }, 10000);
