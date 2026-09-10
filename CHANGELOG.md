@@ -9,7 +9,12 @@ La [ROADMAP](ROADMAP.md) liste ce qui est prévu.
 
 ## [Non publié]
 
-_Rien pour le moment._
+### CI
+
+- Publication de l'image Docker sur `ghcr.io/leolesimple/horizn` à chaque tag `v*`,
+  après passage de la CI (`node` + `docker`). Tags générés : `{version}`,
+  `{major}.{minor}`, `{major}`, plus `latest` pour les versions stables. Le
+  déploiement continue de reconstruire l'image localement pour l'instant.
 
 ## [2.0.1] — 2026-09-10
 
