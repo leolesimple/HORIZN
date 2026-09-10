@@ -1,6 +1,6 @@
 {
   "name": "horizn",
-  "version": "2.0.0-beta.2",
+  "version": "2.0.1",
   "description": "HORIZN is a RESTful API engine for InfoStation, merging PRIM realtime and GTFS data.",
   "main": "js/index.js",
   "scripts": {

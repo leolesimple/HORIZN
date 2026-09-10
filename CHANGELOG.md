@@ -5,7 +5,7 @@ Toutes les modifications notables de HORIZN sont documentées ici.
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et ce projet suit [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0-beta.2] — 2026-09-10
+## [2.0.1] — 2026-09-10
 
 ### Ajouté
 
