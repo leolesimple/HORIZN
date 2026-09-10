@@ -5,11 +5,11 @@ Toutes les modifications notables de HORIZN sont documentées ici.
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et ce projet suit [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Non publié]
+## [2.0.1] — 2026-09-10
 
 ### Ajouté
 
-- **Suivi de la dernière utilisation des clés API** — chaque requête acceptée met à jour `lastUsedAt` et `usageCount` dans `data/api_keys.json`. Écriture différée (`KeyUsageService` : flush toutes les 30 s + à l'arrêt, écriture atomique tmp + rename). Les clés `.env` sont suivies en mémoire uniquement.
+- **Suivi de la dernière utilisation des clés API** — chaque requête acceptée met à jour `lastUsedAt` et `usageCount` dans `data/api_keys.json`. Écriture différée (`KeyUsageService` : flush toutes les 30 s + à l'arrêt) : lecture atomique `fd`+`fstat`, écriture `tmp`+`rename` avec préservation du mode du fichier et garde anti-course (mtime) contre les écritures concurrentes de `keys.js`. Les clés `.env` sont suivies en mémoire uniquement.
 - `GET /admin/keys` — inventaire des clés (aperçu masqué) : rôle, nom, source (`file`/`env`), dernière utilisation, compteur cumulé, et consommation de quota en temps réel par classe de route (`quota.<classe>`, `quota.worstPct`). Également exposé sous `keys` dans `GET /admin/horizn`.
 - `npm run keys list` affiche la dernière utilisation et le nombre d'utilisations par clé.
 - Support de `API_KEYS_FILE` (chemin du fichier de clés) dans `auth.js`, `keys.js` et `KeyUsageService.js`.
