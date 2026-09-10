@@ -31,8 +31,10 @@ const ENV_KEYS = [
   ['ADMIN_API_KEY',    'admin'],
 ];
 
-// Delta d'usage depuis le dernier flush : Map<key, { lastUsedAt, usageCount }>
-let _pending = new Map();
+// Delta d'usage depuis le dernier flush : Map<key, { lastUsedAt, usageCount }>.
+// `flush()` retire les clés fichier persistées via `_pending.delete()` — jamais
+// de ré-affectation, donc `const`.
+const _pending = new Map();
 let _dirty = false;
 let _timer = null;
 
@@ -67,22 +69,35 @@ function stop() {
 /**
  * Reverse le delta d'usage en mémoire dans data/api_keys.json.
  *
- * Le fichier est relu juste avant écriture pour ne pas écraser une
- * génération/révocation faite entre-temps par js/scripts/keys.js. Écriture
- * atomique (tmp + rename). 100 % synchrone : sûr à appeler pendant l'arrêt.
+ * - Lecture atomique (fd + fstat) puis merge puis écriture `tmp` + `rename`.
+ * - Le mode du fichier existant est préservé (un `api_keys.json` en 0600 le reste).
+ * - Garde anti-course : si `js/scripts/keys.js` a réécrit le fichier entre notre
+ *   lecture et le rename (mtime différente), on abandonne ce flush et on retente
+ *   au cycle suivant plutôt que d'écraser une génération/révocation.
+ * - Sur erreur de lecture/écriture, `_dirty` est conservé (retry au prochain flush).
+ * - Seules les clés fichier réécrites sont retirées du delta ; les clés `.env`
+ *   restent en mémoire et s'y accumulent.
  *
- * Seules les clés effectivement réécrites sont retirées du delta ; les clés
- * .env (jamais dans le fichier) restent en mémoire et s'y accumulent. En cas
- * d'échec d'écriture, le delta est conservé et retenté au flush suivant.
+ * 100 % synchrone : sûr à appeler pendant l'arrêt.
  *
  * @returns {boolean} true si le fichier a été réécrit.
  */
 function flush() {
   if (!_dirty) return false;
-  _dirty = false;
 
-  const entries = _readFile();
-  if (entries.length === 0) return false;
+  let snapshot;
+  try {
+    snapshot = _loadKeyFile();
+  } catch (err) {
+    console.error(`[KeyUsage] lecture de ${path.basename(KEYS_FILE)} impossible, flush reporté : ${err.message}`);
+    return false; // _dirty conservé → retry
+  }
+
+  const { entries, stat } = snapshot;
+  if (entries.length === 0) {
+    _dirty = false; // aucune clé fichier à mettre à jour (fichier absent ou vide)
+    return false;
+  }
 
   let changed = false;
   for (const entry of entries) {
@@ -95,15 +110,26 @@ function flush() {
     changed = true;
   }
 
-  if (!changed) return false;
+  if (!changed) { _dirty = false; return false; }
 
+  const tmp = `${KEYS_FILE}.tmp`;
   try {
-    const tmp = `${KEYS_FILE}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(entries, null, 2) + '\n');
+    fs.chmodSync(tmp, stat.mode & 0o777);
+
+    if (fs.statSync(KEYS_FILE).mtimeMs !== stat.mtimeMs) {
+      fs.unlinkSync(tmp);
+      _dirty = true;
+      console.warn('[KeyUsage] api_keys.json modifié pendant le flush — report au prochain cycle');
+      return false;
+    }
+
     fs.renameSync(tmp, KEYS_FILE);
     for (const entry of entries) _pending.delete(entry.key);
+    _dirty = false;
     return true;
   } catch (err) {
+    try { fs.unlinkSync(tmp); } catch { /* déjà absent */ }
     console.error(`[KeyUsage] flush impossible : ${err.message}`);
     _dirty = true;
     return false;
@@ -120,7 +146,7 @@ function flush() {
 async function report() {
   const rateLimit = require('../middleware/rateLimit');
 
-  const fileEntries = _readFile();
+  const fileEntries = _readEntriesSafe();
   const seen = new Set();
   const rows = [];
 
@@ -185,10 +211,35 @@ async function _shape(row, rateLimit) {
   };
 }
 
-function _readFile() {
+/**
+ * Lit le fichier de clés de façon atomique (fd + fstat, pour que le mtime
+ * corresponde exactement au contenu lu).
+ *   - fichier absent → { entries: [], stat: null }
+ *   - toute autre erreur (permissions, I/O, JSON invalide) → lève
+ *
+ * @returns {{ entries: Array, stat: import('fs').Stats | null }}
+ */
+function _loadKeyFile() {
+  let fd;
   try {
-    const arr = JSON.parse(fs.readFileSync(KEYS_FILE, 'utf-8'));
-    return Array.isArray(arr) ? arr : [];
+    fd = fs.openSync(KEYS_FILE, 'r');
+  } catch (err) {
+    if (err.code === 'ENOENT') return { entries: [], stat: null };
+    throw err;
+  }
+  try {
+    const stat = fs.fstatSync(fd);
+    const arr = JSON.parse(fs.readFileSync(fd, 'utf-8'));
+    return { entries: Array.isArray(arr) ? arr : [], stat };
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/** Comme _loadKeyFile mais renvoie [] au lieu de lever (pour report()). */
+function _readEntriesSafe() {
+  try {
+    return _loadKeyFile().entries;
   } catch {
     return [];
   }
