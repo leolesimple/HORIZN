@@ -73,9 +73,54 @@ jobs:
       - name: Build image
         run: docker build --tag horizn-ci .
 
+  release:
+    name: Semantic Release
+    # Uniquement sur push direct sur main (pas sur les tags, pas sur les PR),
+    # et seulement si le reste de la CI passe.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [node, docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      # fetch-depth: 0 -> historique complet, nécessaire pour analyser les
+      # commits depuis le dernier tag. token: PAT admin -> pousse le commit
+      # de release sur main malgré la protection de branche (PR obligatoire),
+      # les admins n'étant pas soumis (enforce_admins: false).
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      # semantic-release et ses plugins exigent Node >=22 ; sans rapport avec
+      # le runtime de l'app (Node 20, cf. job "Node.js checks" et Dockerfile).
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GIT_AUTHOR_NAME: leolesimple
+          GIT_AUTHOR_EMAIL: leolesimple@icloud.com
+          GIT_COMMITTER_NAME: leolesimple
+          GIT_COMMITTER_EMAIL: leolesimple@icloud.com
+        run: npx semantic-release
+
   publish:
     name: Publish image (GHCR)
-    # Sur push d'un tag v* uniquement, et seulement si le reste de la CI passe.
+    # Sur push d'un tag v* uniquement (déclenché par le commit de release
+    # ci-dessus), et seulement si le reste de la CI passe.
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [node, docker]
     runs-on: ubuntu-latest
