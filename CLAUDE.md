@@ -104,3 +104,48 @@ auth si nécessaire. Le dashboard admin vit ailleurs (Next.js sur `admin.horizn.
 
 `type(scope): description` — types : `feat` `fix` `perf` `docs` `chore`. Scopes vus : `auth`, `next`,
 `gtfs`, `deps`, `readme`. Voir `.gitmessage`.
+
+⚠️ **Depuis `semantic-release` (job `release` dans `ci.yml`), ces types pilotent directement la
+version publiée** (preset `angular` du `commit-analyzer`) :
+
+| Type / marqueur | Effet |
+|---|---|
+| `feat` | minor |
+| `fix`, `perf`, `revert` | patch |
+| `docs(readme: ...)` | patch (scope `readme` uniquement) |
+| `BREAKING CHANGE:` en pied de commit, ou `!` après le type (`feat!:`) | major |
+| `docs`, `chore`, `style`, `refactor`, `test`, `build`, `ci` (sans le cas ci-dessus) | pas de release |
+
+**Ne plus jamais bumper `package.json`/`CHANGELOG.md` à la main, ni créer de tag/PR
+`chore(release): x.y.z`, ni de GitHub Release manuelle.** Tout ça part automatiquement au push
+d'un `feat`/`fix`/`perf` sur `main` — voir `## Release` ci-dessous.
+
+## Release
+
+`.releaserc.json` + job `release` (`.github/workflows/ci.yml`, `needs: [node, docker]`,
+uniquement sur `push` direct vers `main`, jamais sur PR ni sur push de tag) :
+
+1. `commit-analyzer` détermine le bump depuis les commits accumulés depuis le dernier tag
+   (tableau ci-dessus). Si tout est `docs`/`chore`/`ci` → aucune release, le job sort sans rien faire.
+2. `release-notes-generator` + `changelog` génèrent les notes et les insèrent en tête de
+   `CHANGELOG.md` (style Angular en anglais — différent des sections manuelles précédentes,
+   rédigées en français).
+3. `npm` (avec `npmPublish: false` — le repo est `private`) réécrit la version dans `package.json`.
+4. `git` commit `package.json` + `package-lock.json` + `CHANGELOG.md` (`chore(release): x.y.z`,
+   **sans** `[skip ci]` volontairement) et pousse sur `main`, puis crée+pousse le tag `vx.y.z`.
+5. `github` crée la GitHub Release.
+6. Le push du tag (étape 4) redéclenche `ci.yml` → job `publish` → image GHCR.
+
+**Le job `release` pousse sur `main` avec un PAT** (`secrets.RELEASE_TOKEN`, compte admin), pas le
+`GITHUB_TOKEN` par défaut — nécessaire pour contourner la protection « PR obligatoire » (les admins
+ne sont pas soumis, `enforce_admins: false`). **Sans ce secret configuré, le job échoue** à l'étape
+`git push` ; ça ne bloque rien d'autre (seuls `Node.js checks` et `Docker build` sont des checks
+requis par la protection de branche).
+
+`semantic-release` et ses plugins exigent Node ≥ 22 (`engines`) — sans rapport avec le runtime de
+l'app (Node 20). Le job `release` a son propre `setup-node` à `22`.
+
+Pas de `[skip ci]` sur le commit de release : sinon GitHub Actions saute aussi le push de tag qui
+en découle (même commit, même message) et `publish` ne se déclenche jamais. Le re-run de
+`node`/`docker`/`release` sur ce commit est un no-op rapide (aucun commit après le dernier tag),
+pas une boucle infinie.
