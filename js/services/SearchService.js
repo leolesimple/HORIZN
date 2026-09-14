@@ -5,7 +5,7 @@ const fs           = require('fs');
 const path         = require('path');
 const cacheService = require('./CacheService');
 
-const API_KEY=process.env.PRIM_KEY || 'SA2gwXmU8tMANuVvb1cei7oQc3FjEGOQ';
+const API_KEY = process.env.PRIM_API_KEY;
 const NAVITIA_BASE = 'https://prim.iledefrance-mobilites.fr/marketplace/v2/navitia';
 const TIMEOUT_MS   = 8000;
 const CACHE_TTL_SEC = 24 * 3600; // 24 heures (les arrêts bougent rarement)

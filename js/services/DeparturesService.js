@@ -5,7 +5,7 @@ const gtfs    = require('./GTFSService');
 const cache   = require('./CacheService');
 const { DEPARTURE_STATUS } = require('../constants');
 
-const API_KEY  = process.env.PRIM_API_KEY  || 'SA2gwXmU8tMANuVvb1cei7oQc3FjEGOQ';
+const API_KEY  = process.env.PRIM_API_KEY;
 const PRIM_URL = 'https://prim.iledefrance-mobilites.fr/marketplace/stop-monitoring';
 const DELAY_THRESHOLD_SECONDS = 300; // 5 min
 
