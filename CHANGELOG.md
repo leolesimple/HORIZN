@@ -1,3 +1,10 @@
+## [2.0.2](https://github.com/[secure]/HORIZN/compare/v2.0.1...v2.0.2) (2026-09-14)
+
+
+### Bug Fixes
+
+* **security:** retirer la clé PRIM en dur et corriger la variable SearchService ([bc8561d](https://github.com/[secure]/HORIZN/commit/bc8561de3b6597e814d545c82881350bba277cd9))
+
 # Changelog
 
 Toutes les modifications notables de HORIZN sont documentées ici.
