@@ -2,7 +2,7 @@ services:
   horizn:
     build: .
     container_name: horizn
-    mem_limit: 512m
+    mem_limit: 4g
     logging:
       driver: json-file
       options:
