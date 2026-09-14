@@ -128,6 +128,7 @@ app.get('/health', (req, res) => {
 
   res.json({
     status: dbOk ? 'ok' : 'degraded',
+    version: require('../package.json').version,
     uptime: Math.round((Date.now() - require('./services/AdminService').STARTED_AT) / 1000),
     db: dbOk,
     timestamp: new Date().toISOString(),

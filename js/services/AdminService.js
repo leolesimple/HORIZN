@@ -111,6 +111,7 @@ function getHealth() {
   const uptime = Math.round((Date.now() - STARTED_AT) / 1000);
   return {
     status: 'ok',
+    version: require('../../package.json').version,
     uptime,
     uptimeHuman: _fmtDuration(uptime),
     startedAt: new Date(STARTED_AT).toISOString(),
