@@ -1,3 +1,10 @@
+# [2.1.0](https://github.com/[secure]/HORIZN/compare/v2.0.2...v2.1.0) (2026-09-14)
+
+
+### Features
+
+* **health:** exposer le numéro de version dans /health et /admin/health ([6c68be7](https://github.com/[secure]/HORIZN/commit/6c68be7e1ff355dbaa65326cbac224a8a31a9a8d))
+
 ## [2.0.2](https://github.com/[secure]/HORIZN/compare/v2.0.1...v2.0.2) (2026-09-14)
 
 
