@@ -78,10 +78,10 @@ Télécharge le ZIP IDFM si > 24 h, hash SHA256 → skip si inchangé, sinon reb
 
 ## Pièges connus (vérifiés dans le code, pas encore corrigés)
 
-- **`js/services/NextService.js` est du code mort** : `index.js` n'importe que `DeparturesService`. NextService a son propre cache mémoire et le parsing `trainNum` « corrigé » (`TrainNumbers.TrainNumberRef[0].value`) — que `DeparturesService` (le service actif) n'a *pas* (il lit encore `TrainNumbers?.[0]?.value`).
+- **`js/services/NextService.js` a été supprimé** (code mort — `index.js` n'importe que `DeparturesService`). Le parsing `trainNum` « corrigé » (`TrainNumbers.TrainNumberRef[0].value`) que portait NextService n'est pas reporté sur `DeparturesService` (qui lit encore `TrainNumbers?.[0]?.value`).
 - **`setupGTFS.js` n'importe que `stops/routes/trips/stop_times`** — pas `calendar.txt` ni `shapes.txt`. Or `GTFSService` fait un `INNER JOIN calendar`. Une DB construite uniquement par le script actuel renvoie donc **zéro** départ/horaire GTFS. Vérifier comment `calendar` est peuplé dans l'environnement déployé avant de toucher à ce chemin.
-- **Noms de variables PRIM incohérents** : `DeparturesService`/`TrafficService`/`index.js` lisent `process.env.PRIM_API_KEY` ; `SearchService.js` lit `process.env.PRIM_KEY` (nom différent). Les quatre ont un **fallback en dur** vers une clé PRIM réelle — à retirer, pas à propager.
-- **`.env.example` documente `API_KEYS=key1,key2`** : cette variable n'est lue nulle part. Les vraies sont `FRONTEND_API_KEY` / `ADMIN_API_KEY` (absentes de l'exemple).
+- **Noms de variables PRIM** : tous les services lisent désormais `process.env.PRIM_API_KEY` (le fallback en dur et l'ancien `PRIM_KEY` de `SearchService` ont été retirés en v2.0.2).
+- **`.env.example`** : corrigé — documente `FRONTEND_API_KEY` / `ADMIN_API_KEY` (la variable `API_KEYS` inexistante a été retirée).
 - **Port par défaut** : `index.js` fait `process.env.PORT || '3000'` ; tout le reste (compose, Dockerfile, docs, Tunnel) suppose **3003**. Toujours exporter `PORT` en local.
 - **Rate limiting derrière le Tunnel** : `app.set('trust proxy', …)` n'est pas configuré. Sans effet pour les clés connues (quota indexé sur `sha256(clé)`), mais le fallback IP voit l'IP réseau Docker → les requêtes non authentifiées partagent un seul bucket.
 - **`/next` renvoie 404** quand aucune donnée n'est disponible, alors que le README annonce « 200 + tableau vide ». Les autres endpoints renvoient bien 200 + `count: 0`.
