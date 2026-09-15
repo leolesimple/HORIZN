@@ -85,7 +85,6 @@ Les run cron : 08:05, 13:05, 17:05. Skip si hash ZIP identique. Swap atomique de
 |------|-----------|
 | `./json` | `/app/json:ro` |
 | `./data` | `/app/data` |
-| `./js/cache` | `/app/js/cache` |
 | `./.env` | `/app/.env:ro` |
 
 Ces volumes sont les SEULS points d'entrée aux fichiers — ils ne passent pas par Express.

@@ -1,10 +1,10 @@
 'use strict';
 
-const fs   = require('fs');
-const path = require('path');
+const fs    = require('fs');
+const path  = require('path');
+const cache = require('./CacheService');
 
-const CACHE_DIR = path.join(__dirname, '..', 'cache');
-const LOG_DIR   = process.env.LOG_DIR || path.join(__dirname, '..', '..', 'data', 'logs');
+const LOG_DIR = process.env.LOG_DIR || path.join(__dirname, '..', '..', 'data', 'logs');
 const STARTED_AT = Date.now();
 
 /**
@@ -79,29 +79,10 @@ function queryLogs({ path: filterPath, statusMin, statusMax, durationMin, limit 
 }
 
 /**
- * État des fichiers de cache.
+ * État du cache (SQLite, `data/cache.db`).
  */
 function getCacheStatus() {
-  if (!fs.existsSync(CACHE_DIR)) return { files: [], totalSize: 0 };
-  const files = fs.readdirSync(CACHE_DIR)
-    .filter(f => f.endsWith('.json'))
-    .map(f => {
-      const p  = path.join(CACHE_DIR, f);
-      const st = fs.statSync(p);
-      return {
-        file: f,
-        size: st.size,
-        ageSeconds: Math.round((Date.now() - st.mtimeMs) / 1000),
-        modifiedAt: st.mtime.toISOString(),
-      };
-    })
-    .sort((a, b) => a.ageSeconds - b.ageSeconds);
-
-  return {
-    files,
-    totalSize: files.reduce((s, f) => s + f.size, 0),
-    count: files.length,
-  };
+  return cache.status();
 }
 
 /**

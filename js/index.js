@@ -16,6 +16,7 @@ const gtfs       = require('./services/GTFSService');
 const traffic    = require('./services/TrafficService');
 const search     = require('./services/SearchService');
 const equipment  = require('./services/EquipmentService');
+const cache      = require('./services/CacheService');
 const { requireAdmin, requireFrontend } = require('./middleware/auth');
 const { rateLimitPublic, rateLimitAdmin, rateLimitSearch, rateLimitNext } = require('./middleware/rateLimit');
 const { denySensitivePaths, securityHeaders } = require('./middleware/security');
@@ -25,7 +26,6 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 const QUIET_MODE = ['1', 'true', 'yes', 'on'].includes(String(process.env.QUIET_MODE || '').toLowerCase());
 
 const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, '..', 'data', 'infostation.db');
-const CACHE_DIR = path.join(__dirname, 'cache');
 
 const HORIZN_ASCII = [
   '  _  _  ___  ___ ___ _____  _ ',
@@ -158,14 +158,8 @@ app.get('/status', rateLimitPublic, requireFrontend, async (req, res) => {
   // Cache
   results.cache = { available: false };
   try {
-    if (fs.existsSync(CACHE_DIR)) {
-      const files = fs.readdirSync(CACHE_DIR).filter(f => f.endsWith('.json'));
-      results.cache = {
-        available: true,
-        fileCount: files.length,
-        totalSize: files.reduce((s, f) => s + (fs.statSync(path.join(CACHE_DIR, f)).size || 0), 0),
-      };
-    }
+    const status = cache.status();
+    results.cache = { available: true, keyCount: status.count, totalSize: status.totalSize };
   } catch (err) {
     results.cache = { available: false, error: err.message };
   }
@@ -325,11 +319,36 @@ app.get('/traffic', rateLimitPublic, requireFrontend, async (req, res) => {
 
 // --- GET /search ---
 app.get('/search', rateLimitSearch, requireFrontend, async (req, res) => {
+  const { lat, lon } = req.query;
+
+  // Mode géographique : stations à proximité d'un point (recherche locale, sans PRIM)
+  if (lat !== undefined || lon !== undefined) {
+    const latNum = parseFloat(lat);
+    const lonNum = parseFloat(lon);
+
+    if (!Number.isFinite(latNum) || !Number.isFinite(lonNum)
+      || latNum < -90 || latNum > 90 || lonNum < -180 || lonNum > 180) {
+      return res.status(400).json({ error: 'Paramètres "lat"/"lon" invalides (coordonnées WGS84 requises).' });
+    }
+
+    const count  = Math.min(parseInt(req.query.count  || '10',   10), 50);
+    const radius = Math.min(parseInt(req.query.radius || '1000', 10), 5000);
+
+    try {
+      const results = await search.searchNearby(latNum, lonNum, { count, radius });
+      return res.json({ lat: latNum, lon: lonNum, radius, count: results.length, results });
+    } catch (err) {
+      console.error(`[ERROR] /search lat=${lat} lon=${lon}: ${err.message}`);
+      return res.status(502).json({ error: 'Erreur lors de la recherche géographique.', detail: err.message });
+    }
+  }
+
+  // Mode texte : recherche par nom (PRIM + enrichissement zdaid local)
   const q     = req.query.q;
   const count = Math.min(parseInt(req.query.count || '10', 10), 50);
 
   if (!q || q.length < 2) {
-    return res.status(400).json({ error: 'Paramètre "q" requis (min 2 caractères).' });
+    return res.status(400).json({ error: 'Paramètre "q" requis (min 2 caractères), ou "lat"/"lon" pour une recherche géographique.' });
   }
 
   try {
@@ -448,7 +467,7 @@ function start() {
     if (!QUIET_MODE) {
       console.log(`\n${HORIZN_ASCII}\n`);
       console.log(`✅ HORIZN v${require('../package.json').version} — http://localhost:${PORT}`);
-      console.log(`   GTFS: ${fs.existsSync(DB_PATH) ? '✓' : '✗'}  |  Cache: ${fs.existsSync(CACHE_DIR) ? '✓' : '✗'}`);
+      console.log(`   GTFS: ${fs.existsSync(DB_PATH) ? '✓' : '✗'}  |  Cache: ${fs.existsSync(cache.DB_PATH) ? '✓' : '✗'}`);
     }
   });
 }
