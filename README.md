@@ -38,7 +38,7 @@ Toutes les routes nécessitent une clé API dans le header `X-API-Key`.
 | `GET /admin/horizn` | Dashboard complet (stats, cache, health, clés) | 30/min |
 | `GET /admin/stats` | Métriques du jour | 30/min |
 | `GET /admin/logs` | Logs JSON avec filtres | 30/min |
-| `GET /admin/cache` | État des fichiers de cache | 30/min |
+| `GET /admin/cache` | État du cache (SQLite) | 30/min |
 | `GET /admin/health` | Santé du service | 30/min |
 | `GET /admin/keys` | Clés API : dernière utilisation, compteur, quota courant | 30/min |
 
@@ -116,20 +116,33 @@ Perturbations trafic RATP, SNCF/Transilien, Bus via l'API `disruptions_bulk` d'I
 | `lineRef` | `string` | — | ID technique IDFM (`C01739` = Transilien J) |
 | `stopId` | `string` | — | `stop_area:IDFM:X` ou `X` seul |
 
-Les deux peuvent être combinés (intersection). Cache : 90s (fichier, partagé avec `/equipments`).
+Les deux peuvent être combinés (intersection). Cache : 90s (SQLite, partagé avec `/equipments`).
 
 ---
 
 ## `GET /search`
 
-Recherche d'arrêts/gares par nom.
+Recherche d'arrêts/gares par nom, ou stations à proximité d'un point.
+
+**Mode texte** (recherche PRIM + enrichissement zdaid local) :
 
 | Param | Type | Défaut | Description |
 |-------|------|--------|-------------|
 | `q` | `string` | **requis** | Texte (min 2 car.) |
 | `count` | `int` | `10` | Max 50 |
 
-Cache : 24h (fichier). Les arrêts changent rarement.
+**Mode géographique** (recherche 100% locale, sans appel PRIM) — activé dès que `lat`/`lon` sont fournis :
+
+| Param | Type | Défaut | Description |
+|-------|------|--------|-------------|
+| `lat` | `float` | **requis** | Latitude WGS84 |
+| `lon` | `float` | **requis** | Longitude WGS84 |
+| `radius` | `int` (mètres) | `1000` | Max 5000 |
+| `count` | `int` | `10` | Max 50 |
+
+Ex : `/search?lat=48.8443&lon=2.3743&radius=500` (stations autour de Gare d'Austerlitz)
+
+Cache : 24h (SQLite). Les arrêts changent rarement.
 
 ---
 
@@ -141,7 +154,7 @@ Pannes d'ascenseurs et escalators. Même source que `/traffic` (disruptions_bulk
 |-------|------|--------|-------------|
 | `stopId` | `string` | — | `stop_area:IDFM:X` — si absent, toutes les pannes |
 
-Cache : 90s (fichier, partagé avec `/traffic`).
+Cache : 90s (SQLite, partagé avec `/traffic`).
 
 ---
 
@@ -247,9 +260,9 @@ par l'auth juste après — sont limitées par IP, ce qui protège contre le bru
 | `DeparturesService` | Fusion GTFS + PRIM StopMonitoring |
 | `TrafficService` | disruptions_bulk filtré par ligne/arrêt |
 | `EquipmentService` | Pannes équipements (partage le cache Traffic) |
-| `SearchService` | Recherche d'arrêts par nom |
+| `SearchService` | Recherche d'arrêts par nom ou géolocalisation |
 | `GTFSService` | Horaires GTFS depuis SQLite |
-| `CacheService` | Cache fichier avec TTL |
+| `CacheService` | Cache SQLite avec TTL |
 | `LoggerService` | Logs JSON lines journaliers |
 | `AdminService` | Stats, logs, cache, health |
 

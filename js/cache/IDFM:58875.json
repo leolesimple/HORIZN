@@ -1,1 +1,0 @@
-{"Siri":{"ServiceDelivery":{"ResponseTimestamp":"2026-06-11T23:36:11.564Z","ProducerRef":"IVTR_HET","ResponseMessageIdentifier":"IVTR_HET:ResponseMessage:b5b734b4-89c7-474b-9235-d2da56c1f735:LOC:","StopMonitoringDelivery":[{"ResponseTimestamp":"2026-06-11T23:36:11.585Z","Version":"2.0","Status":"true","MonitoredStopVisit":[],"StopLineNotice":[],"ServiceException":[]}]}}}
