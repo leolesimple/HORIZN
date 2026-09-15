@@ -1,3 +1,10 @@
+# [2.2.0](https://github.com/[secure]/HORIZN/compare/v2.1.0...v2.2.0) (2026-09-15)
+
+
+### Features
+
+* **search:** recherche géographique de stations + cache SQLite ([#16](https://github.com/[secure]/HORIZN/issues/16)) ([49bf49f](https://github.com/[secure]/HORIZN/commit/49bf49f72521fc6459cb7583644fca7e28a0066f))
+
 # [2.1.0](https://github.com/[secure]/HORIZN/compare/v2.0.2...v2.1.0) (2026-09-14)
 
 
