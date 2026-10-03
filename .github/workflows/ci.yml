@@ -52,7 +52,9 @@ jobs:
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
 
           for attempt in {1..10}; do
-            if curl --fail --silent --show-error http://127.0.0.1:3003/health; then
+            code=$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3003/health || true)
+            if [ "$code" = "200" ] || [ "$code" = "503" ]; then
+              echo "Server ready (health HTTP $code; 503 attendu en CI sans base GTFS ni clé PRIM)"
               exit 0
             fi
             sleep 1
