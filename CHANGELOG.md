@@ -1,3 +1,13 @@
+## [2.2.1](https://github.com/[secure]/HORIZN/compare/v2.2.0...v2.2.1) (2026-10-03)
+
+
+### Bug Fixes
+
+* **gtfs:** importer calendar.txt et shapes.txt, attendre la fin du rebuild ([74cbde7](https://github.com/[secure]/HORIZN/commit/74cbde7646a8efb2998c13774403a69fcead9a95))
+* **next:** lire les numéros de train dans TrainNumberRef ([2aa6337](https://github.com/[secure]/HORIZN/commit/2aa633731df726fd9f0eb09a3f26cfc2b29d7c2a))
+* **rate-limit:** activer trust proxy derrière le Tunnel ([15082fc](https://github.com/[secure]/HORIZN/commit/15082fc73edff6da110ff35e79d162c468164b9e))
+* **status:** mode dégradé par source et mode maintenance ([3709a31](https://github.com/[secure]/HORIZN/commit/3709a3149275a4784f31eb192db517da3e15f316))
+
 # [2.2.0](https://github.com/[secure]/HORIZN/compare/v2.1.0...v2.2.0) (2026-09-15)
 
 
