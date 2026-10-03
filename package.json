@@ -10,6 +10,7 @@
     "setup-gtfs": "node js/scripts/setupGTFS.js",
     "migrate-stops": "node js/scripts/migrateStops.js",
     "keys": "node js/scripts/keys.js",
+    "maintenance": "node js/scripts/maintenance.js",
     "release": "semantic-release"
   },
   "private": true,
