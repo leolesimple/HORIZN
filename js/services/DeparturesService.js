@@ -112,7 +112,7 @@ function _normalizePrim(visit) {
     direction:   mvj.DirectionRef?.value   || null,
     destination: mvj.DestinationName?.[0]?.value || null,
     mission:     mvj.JourneyNote?.map(n => n.value).join(', ') || '',
-    trainNum:    mvj.TrainNumbers?.[0]?.value || null,
+    trainNum:    mvj.TrainNumbers?.TrainNumberRef?.[0]?.value || null,
     vehicleFeatures: mvj.VehicleFeatureRef?.[0] || null,
     journeyRef:  mvj.FramedVehicleJourneyRef?.DatedVehicleJourneyRef || null,
     quai:        mc?.ArrivalPlatformName?.value || null,
