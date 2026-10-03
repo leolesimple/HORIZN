@@ -18,6 +18,47 @@ Toutes les routes nécessitent une clé API dans le header `X-API-Key`.
 
 ---
 
+## 🩺 Mode dégradé
+
+Les routes qui dépendent d'une source externe (`/next`, `/timetable`, `/traffic`,
+`/equipments`, `/search` en mode texte) répondent toujours avec un `status`
+global et un tableau `sources` — un objet `{ source, status }` par type de
+donnée sollicité, pour afficher un badge par source côté client sans
+connaître les clés à l'avance. Jamais le nom du fournisseur interne :
+
+```json
+"sources": [
+  { "source": "realtime", "status": "up" },
+  { "source": "static",   "status": "down" }
+]
+```
+
+| Label `source` | Type de donnée |
+|------------------|-----------------|
+| `realtime` | Temps réel (utilisé par `/next`) |
+| `static`   | Horaires statiques GTFS (`/next`, `/timetable`) |
+| `traffic`  | Perturbations trafic (`/traffic`, `/equipments`) |
+| `places`   | Recherche par nom (`/search?q=`) |
+
+Une source non sollicitée par la requête (ex: `static` quand `includeGTFS=false`)
+est **omise** du tableau, pas listée en `down`.
+
+| Code HTTP | `status` | Signification |
+|-----------|----------|----------------|
+| `200` | `ok` | Toutes les sources sollicitées ont répondu |
+| `206` | `degraded` | Au moins une source a échoué, réponse partielle |
+| `503` | `down` | Toutes les sources sollicitées sont en panne (jamais de 404) |
+| `503` | `maintenance` | Mode maintenance manuel actif (voir `POST /admin/maintenance`) |
+
+`/search` en mode géographique (`lat`/`lon`) n'a aucune dépendance externe et
+reste toujours `200`, sans `status`/`sources`.
+
+Au démarrage, le serveur sonde une fois chaque source (`realtime`/`static`/`traffic`/`places`)
+avant même la première requête cliente — `GET /status` renvoie donc un `sources` complet dès
+le boot plutôt qu'un tableau vide en attendant qu'un client déclenche chaque route.
+
+---
+
 ## 📡 Endpoints
 
 ### Routes publiques — `X-API-Key: <clé frontend>`
@@ -29,7 +70,7 @@ Toutes les routes nécessitent une clé API dans le header `X-API-Key`.
 | `GET /traffic` | Perturbations par ligne/arrêt | `lineRef=C01739` ou `stopId=71135` | 100/min |
 | `GET /search` | Recherche d'arrêts par nom | `q=austerlitz` | 20/min |
 | `GET /equipments` | Pannes ascenseurs/escalators | `stopId=71135` | 100/min |
-| `GET /status` | État des dépendances (GTFS, PRIM, cache) | — | 100/min |
+| `GET /status` | État complet : GTFS, cache, les 4 sources, maintenance | — | 100/min |
 
 ### Routes admin — `X-API-Key: <clé admin>`
 
@@ -41,6 +82,8 @@ Toutes les routes nécessitent une clé API dans le header `X-API-Key`.
 | `GET /admin/cache` | État du cache (SQLite) | 30/min |
 | `GET /admin/health` | Santé du service | 30/min |
 | `GET /admin/keys` | Clés API : dernière utilisation, compteur, quota courant | 30/min |
+| `GET /admin/maintenance` | État du mode maintenance | 30/min |
+| `POST /admin/maintenance` | Active/désactive le mode maintenance — **double sécurisation** (clé admin + `X-Maintenance-Secret`) | 30/min |
 
 ### Sans auth
 
@@ -75,6 +118,11 @@ curl -H "X-API-Key: hzn_..." "http://localhost:3003/next?stopId=DU496&full=true"
   "accessible": true,
   "geopoint": { "lon": 2.238, "lat": 48.892 },
   "horizon": 5,
+  "status": "ok",
+  "sources": [
+    { "source": "realtime", "status": "up" },
+    { "source": "static",   "status": "up" }
+  ],
   "departures": [
     {
       "line": "STIF:Line::C01742:",
@@ -92,6 +140,10 @@ curl -H "X-API-Key: hzn_..." "http://localhost:3003/next?stopId=DU496&full=true"
 }
 ```
 
+L'entrée `static` est omise du tableau `sources` si `includeGTFS=false` (source
+non sollicitée, pas en panne). Voir [Mode dégradé](#-mode-dégradé) pour le
+détail des codes HTTP.
+
 Cache : 30s par stopId (PRIM StopMonitoring).
 
 ---
@@ -105,6 +157,9 @@ Horaires GTFS statiques complets pour une journée entière. Nécessite une base
 | `stopId` | `string` | **requis** | ID zdaid |
 | `date` | `string` | aujourd'hui | `YYYY-MM-DD` |
 
+Répond `count: 0` + `status: "down"` (503) si la base GTFS est indisponible,
+plutôt que l'erreur dédiée d'avant — voir [Mode dégradé](#-mode-dégradé).
+
 ---
 
 ## `GET /traffic`
@@ -117,6 +172,7 @@ Perturbations trafic RATP, SNCF/Transilien, Bus via l'API `disruptions_bulk` d'I
 | `stopId` | `string` | — | `stop_area:IDFM:X` ou `X` seul |
 
 Les deux peuvent être combinés (intersection). Cache : 90s (SQLite, partagé avec `/equipments`).
+Réponse enrichie de `status` + entrée `traffic` dans `sources` — voir [Mode dégradé](#-mode-dégradé).
 
 ---
 
@@ -142,7 +198,9 @@ Recherche d'arrêts/gares par nom, ou stations à proximité d'un point.
 
 Ex : `/search?lat=48.8443&lon=2.3743&radius=500` (stations autour de Gare d'Austerlitz)
 
-Cache : 24h (SQLite). Les arrêts changent rarement.
+Cache : 24h (SQLite). Les arrêts changent rarement. Le mode texte renvoie
+`status` + entrée `places` dans `sources` — voir [Mode dégradé](#-mode-dégradé).
+Le mode géographique n'a aucune dépendance externe et reste toujours `200`.
 
 ---
 
@@ -154,7 +212,37 @@ Pannes d'ascenseurs et escalators. Même source que `/traffic` (disruptions_bulk
 |-------|------|--------|-------------|
 | `stopId` | `string` | — | `stop_area:IDFM:X` — si absent, toutes les pannes |
 
-Cache : 90s (SQLite, partagé avec `/traffic`).
+Cache : 90s (SQLite, partagé avec `/traffic`). Réponse enrichie de `status`
++ entrée `traffic` dans `sources` — voir [Mode dégradé](#-mode-dégradé).
+
+---
+
+## `GET/POST /admin/maintenance`
+
+Active/désactive le mode maintenance manuel (toutes les routes de données
+répondent alors `503 { status: "maintenance" }`, sans même tenter les appels
+amont). **Double sécurisation** : clé admin (`X-API-Key`) **et** un secret
+dédié (`X-Maintenance-Secret`, vérifié contre `MAINTENANCE_SECRET` en `.env`)
+— une clé admin seule ne suffit pas à couper le service. Persisté dans
+`data/maintenance.json`, relu à chaud par le serveur (< 1s).
+
+```bash
+curl -H "X-API-Key: <admin>" http://localhost:3003/admin/maintenance
+
+curl -X POST -H "X-API-Key: <admin>" -H "X-Maintenance-Secret: <secret>" \
+  -H "Content-Type: application/json" \
+  -d '{"enabled": true, "reason": "maintenance planifiée"}' \
+  http://localhost:3003/admin/maintenance
+```
+
+Équivalent en CLI, sans passer par l'API (utile si le secret n'est pas
+configuré) :
+
+```bash
+npm run maintenance -- on --reason "maintenance planifiée"
+npm run maintenance -- off
+npm run maintenance -- status
+```
 
 ---
 

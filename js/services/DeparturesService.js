@@ -3,6 +3,7 @@
 const axios   = require('axios');
 const gtfs    = require('./GTFSService');
 const cache   = require('./CacheService');
+const status  = require('./SystemStatusService');
 const { DEPARTURE_STATUS } = require('../constants');
 
 const API_KEY  = process.env.PRIM_API_KEY;
@@ -11,14 +12,17 @@ const DELAY_THRESHOLD_SECONDS = 300; // 5 min
 
 class DeparturesService {
   /**
-   * Retourne les prochains départs fusionnés GTFS + PRIM.
+   * Retourne les prochains départs fusionnés GTFS + PRIM, ainsi que l'état
+   * des sources ayant répondu. Ne renvoie jamais null : en cas de panne
+   * totale, `departures` est un tableau vide et `sources.*` sont à `false`
+   * — c'est à l'appelant (index.js) de traduire ça en code HTTP.
    *
    * @param {string}  stopId
    * @param {object}  opts
    * @param {boolean} [opts.includeGTFS=true]
    * @param {number}  [opts.limit=20]
    * @param {boolean} [opts.useCache=true]
-   * @returns {Promise<Array>}
+   * @returns {Promise<{ departures: Array, sources: { realtime: boolean, static: boolean|null } }>}
    */
   async getNextDepartures(stopId, opts = {}) {
     const { includeGTFS = true, horizon = 5, useCache = true } = opts;
@@ -45,8 +49,10 @@ class DeparturesService {
         cache.set(`IDFM:${stopId}`, resp.data);
         primVisits = _extractVisits(resp.data);
         primOk     = true;
+        status.reportSourceOk('realtime');
       } catch (err) {
         // Silence volontaire: l'endpoint gère le fallback GTFS ou l'erreur globale.
+        status.reportSourceDown('realtime', err);
       }
     }
 
@@ -59,16 +65,21 @@ class DeparturesService {
         try {
           gtfsRows = gtfs.getScheduledDepartures(stopId, { horizon });
           gtfsOk   = true;
+          status.reportSourceOk('static');
         } catch (err) {
           // Silence volontaire: erreur propagée via le comportement global de l'API.
+          status.reportSourceDown('static', err);
         }
+      } else {
+        status.reportSourceDown('static', new Error('GTFS DB indisponible'));
       }
     }
 
     // --- 3. Fusion ---
-    if (!primOk && !gtfsOk) return null;
-
-    return _mergeAndNormalize(primVisits, gtfsRows, primOk, gtfsOk);
+    return {
+      departures: _mergeAndNormalize(primVisits, gtfsRows, primOk, gtfsOk),
+      sources:    { realtime: primOk, static: includeGTFS ? gtfsOk : null },
+    };
   }
 }
 

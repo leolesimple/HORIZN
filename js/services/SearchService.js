@@ -4,6 +4,7 @@ const axios        = require('axios');
 const fs           = require('fs');
 const path         = require('path');
 const cacheService = require('./CacheService');
+const statusService = require('./SystemStatusService');
 
 const API_KEY = process.env.PRIM_API_KEY;
 const NAVITIA_BASE = 'https://prim.iledefrance-mobilites.fr/marketplace/v2/navitia';
@@ -117,18 +118,25 @@ async function search(query, opts = {}) {
   // Charger l'index zdaid (une seule fois)
   _loadZdaidIndex();
 
-  const resp = await axios.get(`${NAVITIA_BASE}/places`, {
-    params: {
-      q:       query,
-      type:    ['stop_area'],
-      count,
-    },
-    headers: {
-      accept: 'application/json',
-      apikey: API_KEY,
-    },
-    timeout: TIMEOUT_MS,
-  });
+  let resp;
+  try {
+    resp = await axios.get(`${NAVITIA_BASE}/places`, {
+      params: {
+        q:       query,
+        type:    ['stop_area'],
+        count,
+      },
+      headers: {
+        accept: 'application/json',
+        apikey: API_KEY,
+      },
+      timeout: TIMEOUT_MS,
+    });
+    statusService.reportSourceOk('places');
+  } catch (err) {
+    statusService.reportSourceDown('places', err);
+    return [];
+  }
 
   const places = resp.data?.places || [];
 

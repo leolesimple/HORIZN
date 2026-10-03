@@ -2,6 +2,7 @@
 
 const axios        = require('axios');
 const cacheService = require('./CacheService');
+const status       = require('./SystemStatusService');
 
 const API_KEY        = process.env.PRIM_API_KEY;
 const PRIM_BASE      = 'https://prim.iledefrance-mobilites.fr/marketplace';
@@ -26,8 +27,13 @@ async function getLineTraffic(lineRef, stopId, opts = {}) {
   // Recharger si le cache est expiré ou forcé
   let matched = cacheService.get(CACHE_KEY, CACHE_TTL_SEC);
   if (!matched || opts.forceRefresh) {
-    await _fetchAllDisruptions();
-    matched = cacheService.get(CACHE_KEY, CACHE_TTL_SEC);
+    try {
+      await _fetchAllDisruptions();
+      status.reportSourceOk('traffic');
+    } catch (err) {
+      status.reportSourceDown('traffic', err);
+    }
+    matched = cacheService.get(CACHE_KEY, CACHE_TTL_SEC) || [];
   }
 
   // Filtre par ligne

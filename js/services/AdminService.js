@@ -97,7 +97,6 @@ function getHealth() {
     uptimeHuman: _fmtDuration(uptime),
     startedAt: new Date(STARTED_AT).toISOString(),
     gtfsDb: _checkGTFS(),
-    primReachable: null, // rempli à l'appel
   };
 }
 
