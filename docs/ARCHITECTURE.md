@@ -13,7 +13,7 @@ HORIZN/
 │   │   ├── rateLimit.js            ← Rate limiting par route
 │   │   └── security.js             ← Fichiers sensibles + headers sécurité
 │   ├── services/
-│   │   ├── CacheService.js         ← Cache fichier avec TTL
+│   │   ├── CacheService.js         ← Cache SQLite avec TTL
 │   │   ├── DeparturesService.js    ← Fusion GTFS + PRIM StopMonitoring
 │   │   ├── GTFSService.js          ← SQLite GTFS statique
 │   │   ├── TrafficService.js       ← disruptions_bulk → filtré par lineRef/stopId
@@ -86,7 +86,7 @@ graph TB
         end
         
         subgraph "Cache / Stockage"
-            CACHE["CacheService<br/>Fichiers avec TTL"]
+            CACHE["CacheService<br/>SQLite (data/cache.db)"]
             STOPMAP["stopsMap<br/>arrets-stopPoint.json"]
         end
     end
@@ -131,29 +131,29 @@ sequenceDiagram
     SEC->>SEC: denySensitivePaths → securityHeaders → CORS → Logging → Rate Limit → Auth
     SEC->>DS: getNextDepartures(stopId, full=true)
     
-    DS->>CS: get("stop-monitoring:DU496")
+    DS->>CS: get("IDFM:DU496", 30)
     alt Cache valide (<30s)
         CS-->>DS: cached data
     else Cache expiré
         DS->>P: StopMonitoring(MonitoringRef=DU496)
         P-->>DS: SIRI response
-        DS->>CS: set("stop-monitoring:DU496", data, 30s)
+        DS->>CS: set("IDFM:DU496", data)
     end
 
     alt full=true
         DS->>TS: getLineTraffic(null, stopArea)
-        TS->>CS: get("disruptions")
+        TS->>CS: get("disruptions_bulk", 90)
         alt Cache valide (<90s)
             CS-->>TS: cached disruptions
         else
             TS->>P: disruptions_bulk/v2
             P-->>TS: ~919 disruptions
-            TS->>CS: set("disruptions", data, 90s)
+            TS->>CS: set("disruptions_bulk", data)
         end
         TS-->>DS: filtered disruptions
         
         DS->>ES: getEquipmentStatus(stopArea)
-        ES->>CS: get("disruptions") 🔄 partagé
+        ES->>CS: get("disruptions_bulk", 90) 🔄 partagé
         ES-->>DS: equipment failures
     end
 
@@ -170,14 +170,14 @@ sequenceDiagram
     participant P as PRIM API
 
     C->>TS: getLineTraffic("C01739", null)
-    TS->>CS: get("disruptions")
+    TS->>CS: get("disruptions_bulk", 90)
     
     alt Cache valide (<90s)
         CS-->>TS: cached (~1.5 MB)
     else Cache expiré
         TS->>P: disruptions_bulk/v2
         P-->>TS: ~919 disruptions
-        TS->>CS: set("disruptions", data, 90s)
+        TS->>CS: set("disruptions_bulk", data)
     end
     
     TS->>TS: filter(lineId contains "C01739")
@@ -190,21 +190,21 @@ sequenceDiagram
 
 ### 4.1 CacheService.js
 
-Cache fichier persistant avec TTL. Survit aux rebuilds Docker (volume monté).
+Cache SQLite persistant (`data/cache.db`, WAL), une table `cache(key, value, created_at)`. Le TTL est appliqué à la lecture, jamais à l'écriture. Survit aux rebuilds Docker (volume `data` monté).
 
 ```javascript
-get(key)          → data || null
-set(key, data, ttlSeconds) → void
+get(key, maxAge)  → data || null   // null si created_at + maxAge dépassé
+set(key, data)    → void
 ```
 
 **Caches actifs :**
 
 | Clé | Données | TTL | Type |
 |-----|---------|-----|------|
-| `stop-monitoring:{stopId}` | Réponse PRIM StopMonitoring | 30s | Fichier |
-| `disruptions` | Dataset complet disruptions_bulk | 90s | Fichier |
-| `equipments` | Alias → disruptions | 90s | Partagé |
-| `search:{query}` | Résultats recherche | 24h | Fichier |
+| `IDFM:{stopId}` | Réponse PRIM StopMonitoring | 30s | SQLite |
+| `disruptions_bulk` | Dataset complet disruptions_bulk (partagé par traffic et equipments) | 90s | SQLite |
+| `v2:{query}:{count}` | Résultats recherche texte (Navitia places) | 24h | SQLite |
+| `nearby:{lat}:{lon}:{radius}:{count}` | Résultats recherche géographique | 24h | SQLite |
 
 ### 4.2 DeparturesService.js
 
@@ -258,7 +258,7 @@ Stats, logs, cache, health pour les routes admin.
 - `getTodaysStats()` → total reqs, erreurs, avg/max/min duration, byPath
 - `getRecentLogs(limit, since)` → dernières entrées de logs
 - `queryLogs({path, statusMin, statusMax, durationMin, limit})` → logs filtrés
-- `getCacheStatus()` → état du cache fichier (taille, âge, fichiers)
+- `getCacheStatus()` → état du cache SQLite (entrées, taille totale, âge)
 - `getHealth()` → uptime, GTFS disponible
 
 ### 4.9 KeyUsageService.js
@@ -326,7 +326,7 @@ docker compose up -d horizn
 ```
 
 - Image : `node:20-alpine`
-- Volume mounts : `json` (ro), `data` (rw), `js/cache` (rw), `.env` (ro)
+- Volume mounts : `json` (ro), `data` (rw), `.env` (ro) — pas de montage `js/cache` depuis le passage à SQLite
 - Network : `heartbeat-net` (external)
 - HEALTHCHECK : `GET :3003/health` toutes les 30s, 3 retries
 
