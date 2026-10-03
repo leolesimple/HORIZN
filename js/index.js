@@ -22,6 +22,7 @@ const { rateLimitPublic, rateLimitAdmin, rateLimitSearch, rateLimitNext } = requ
 const { denySensitivePaths, securityHeaders } = require('./middleware/security');
 
 const app  = express();
+app.set('trust proxy', 1);
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const QUIET_MODE = ['1', 'true', 'yes', 'on'].includes(String(process.env.QUIET_MODE || '').toLowerCase());
 
