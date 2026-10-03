@@ -39,7 +39,7 @@ async function main() {
   }
 
   q(`  └─ Nouveau ZIP (${zipHash.slice(0,12)}…), import…`);
-  rebuildDB();
+  await rebuildDB();
   writeHash(zipHash);
   q(`  ✅ Terminé (${(fs.statSync(DB_PATH).size / 1e9).toFixed(1)} GB)`);
 }
@@ -110,11 +110,25 @@ async function rebuildDB() {
     t(rows);
   };
 
+  const sCal = db.prepare(`INSERT OR REPLACE INTO calendar (service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date) VALUES (?,?,?,?,?,?,?,?,?,?)`);
+  ins.calendar = rows => {
+    const t = db.transaction(r => { for (const x of r) sCal.run(x.service_id, n(x.monday), n(x.tuesday), n(x.wednesday), n(x.thursday), n(x.friday), n(x.saturday), n(x.sunday), x.start_date||null, x.end_date||null); });
+    t(rows);
+  };
+
+  const sShape = db.prepare(`INSERT INTO shapes (shape_id,shape_pt_lat,shape_pt_lon,shape_pt_sequence) VALUES (?,?,?,?)`);
+  ins.shapes = rows => {
+    const t = db.transaction(r => { for (const x of r) sShape.run(x.shape_id, n(x.shape_pt_lat), n(x.shape_pt_lon), n(x.shape_pt_sequence)); });
+    t(rows);
+  };
+
   // Import chaque table (séquentiel — chaque await est nécessaire)
   await importCSV(ZIP_PATH, 'stops.txt',      db, ins.stops);
   await importCSV(ZIP_PATH, 'routes.txt',     db, ins.routes);
   await importCSV(ZIP_PATH, 'trips.txt',      db, ins.trips);
   await importCSV(ZIP_PATH, 'stop_times.txt', db, ins.stop_times);
+  await importCSV(ZIP_PATH, 'calendar.txt',   db, ins.calendar);
+  await importCSV(ZIP_PATH, 'shapes.txt',     db, ins.shapes);
 
   q('  └─ Création index…');
   db.exec(`
