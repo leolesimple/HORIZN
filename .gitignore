@@ -3,5 +3,4 @@ node_modules/
 *.sqlite
 json/arrets-stopPoint.json
 data/
-js/cache/*
 !js/cache/.gitkeep
