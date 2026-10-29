@@ -5,44 +5,6 @@ Toutes les modifications notables de HORIZN sont documentées ici.
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 et ce projet suit [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-La [ROADMAP](ROADMAP.md) liste ce qui est prévu.
-
-## [Non publié]
-
-### CI
-
-- Publication de l'image Docker sur `ghcr.io/leolesimple/horizn` à chaque tag `v*`,
-  après passage de la CI (`node` + `docker`). Tags générés : `{version}`,
-  `{major}.{minor}`, `{major}`, plus `latest` pour les versions stables. Le
-  déploiement continue de reconstruire l'image localement pour l'instant.
-
-## [2.0.1] — 2026-09-10
-
-### Ajouté
-
-- **Suivi de la dernière utilisation des clés API** — chaque requête acceptée met à jour `lastUsedAt` et `usageCount` dans `data/api_keys.json`. Écriture différée (`KeyUsageService` : flush toutes les 30 s + à l'arrêt) : lecture atomique `fd`+`fstat`, écriture `tmp`+`rename` avec préservation du mode du fichier et garde anti-course (mtime) contre les écritures concurrentes de `keys.js`. Les clés `.env` sont suivies en mémoire uniquement.
-- `GET /admin/keys` — inventaire des clés (aperçu masqué) : rôle, nom, source (`file`/`env`), dernière utilisation, compteur cumulé, et consommation de quota en temps réel par classe de route (`quota.<classe>`, `quota.worstPct`). Également exposé sous `keys` dans `GET /admin/horizn`.
-- `npm run keys list` affiche la dernière utilisation et le nombre d'utilisations par clé.
-- Support de `API_KEYS_FILE` (chemin du fichier de clés) dans `auth.js`, `keys.js` et `KeyUsageService.js`.
-
-### Modifié
-
-- **Rate limiting par clé API** au lieu de par IP : le quota est indexé sur `sha256(clé)` pour les clés connues, avec repli sur l'IP pour les requêtes sans clé connue (avant auth, anti-brute-force). `js/middleware/rateLimit.js` expose `getUsage(key)` pour l'introspection.
-
-## [2.0.0] — 2026-09-08
-
-Première version **stable** de HORIZN — promotion de `2.0.0-beta.1` (périmètre
-fonctionnel identique, voir la section ci-dessous).
-
-### Corrigé
-
-- `fix(deps)` — résolution des vulnérabilités signalées par Dependabot (`npm audit`).
-
-### Ajouté
-
-- Workflow CI GitHub Actions (`.github/workflows/ci.yml`) : `npm audit`, `npm ls --all`,
-  `node --check` sur tout `js/`, smoke test `/health`, build de l'image Docker.
-
 ## [2.0.0-beta.1] — 2026-06-11
 
 Première version beta de HORIZN, remplaçant l'ancien ISA (Infostation API v1.2).
@@ -106,10 +68,3 @@ Fusion complète des données PRIM temps réel et GTFS statique.
 - API Navitia pour le Geocoding (places)
 - Authentification : fichier `data/api_keys.json` + JWT
 - Taux de requêtes : `rate-limiter-flexible` avec stockage fichier
-
----
-
-[Non publié]: https://github.com/leolesimple/HORIZN/compare/v2.0.1...HEAD
-[2.0.1]: https://github.com/leolesimple/HORIZN/compare/v2.0.0...v2.0.1
-[2.0.0]: https://github.com/leolesimple/HORIZN/compare/v2.0.0-beta.1...v2.0.0
-[2.0.0-beta.1]: https://github.com/leolesimple/HORIZN/compare/v1.2.0...v2.0.0-beta.1
