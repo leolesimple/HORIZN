@@ -1,3 +1,13 @@
+## [2.2.2](https://github.com/[secure]/HORIZN/compare/v2.2.1...v2.2.2) (2026-11-06)
+
+
+### Bug Fixes
+
+* **ci:** utilise l'adresse noreply GitHub pour le commit de release ([#19](https://github.com/[secure]/HORIZN/issues/19)) ([2e5f040](https://github.com/[secure]/HORIZN/commit/2e5f040507e0e8a90178c34d4987702ce88f0290))
+* **deps:** corrige les vulnérabilités body-parser, follow-redirects, proxy-addr et qs ([#18](https://github.com/[secure]/HORIZN/issues/18)) ([1182839](https://github.com/[secure]/HORIZN/commit/118283926074e1415313518c68f949eec0a5c5f1))
+* **deps:** corrige les vulnérabilités proxy-addr et follow-redirects ([2a90c42](https://github.com/[secure]/HORIZN/commit/2a90c423f5434bb55ce98bc1afbee3c1ea91c2af))
+* **git:** ignore à nouveau le cache IDFM ([7ad2859](https://github.com/[secure]/HORIZN/commit/7ad2859a3f582bad161202ce0c772be96118a81d))
+
 ## [2.2.1](https://github.com/[secure]/HORIZN/compare/v2.2.0...v2.2.1) (2026-10-03)
 
 
